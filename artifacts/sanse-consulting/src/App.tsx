@@ -133,6 +133,17 @@ function Home() {
       </header>
 
       <main id="top">
+        <section className="bg-[#214a3b] px-5 py-20 text-[#f3f3e8] sm:px-8 sm:py-24 lg:px-14">
+          <div className="mx-auto flex max-w-[1280px] flex-col items-start justify-between gap-10 sm:flex-row sm:items-end">
+            <div>
+              <span className="mb-6 flex h-12 w-12 items-center justify-center rounded-full bg-[#dce4c9] text-[#315b47]"><Wind size={22} /></span>
+              <p className="mb-4 text-[10px] font-bold uppercase tracking-[.22em] text-[#c2d0a0]">The Sanse point of view</p>
+              <h2 className="max-w-[700px] font-display text-[clamp(2.8rem,6vw,5.8rem)] leading-[.95] tracking-[-.05em]">Breathing life into<br /><em className="font-normal text-[#c4d39d]">sustainable buildings.</em></h2>
+            </div>
+            <p className="max-w-[300px] pb-2 text-[14px] leading-[1.8] text-[#d2ddc9]">Places shape how we live, work and feel. We help teams make choices that keep that human experience in view.</p>
+          </div>
+        </section>
+
         <section className="mx-auto max-w-[1440px] px-5 pb-16 pt-10 sm:px-8 sm:pt-16 lg:px-14 lg:pb-24 lg:pt-20">
           <div className="grid items-center gap-10 lg:grid-cols-[.89fr_1.11fr] lg:gap-12">
             <div className="reveal relative z-10">
@@ -175,17 +186,6 @@ function Home() {
             <span>For owners, designers & project teams</span>
             <span className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#8e9d66]" /> LEED certification consulting</span>
             <span className="hidden sm:block">A more considered built world</span>
-          </div>
-        </section>
-
-        <section className="bg-[#214a3b] px-5 py-20 text-[#f3f3e8] sm:px-8 sm:py-24 lg:px-14">
-          <div className="mx-auto flex max-w-[1280px] flex-col items-start justify-between gap-10 sm:flex-row sm:items-end">
-            <div>
-              <span className="mb-6 flex h-12 w-12 items-center justify-center rounded-full bg-[#dce4c9] text-[#315b47]"><Wind size={22} /></span>
-              <p className="mb-4 text-[10px] font-bold uppercase tracking-[.22em] text-[#c2d0a0]">The Sanse point of view</p>
-              <h2 className="max-w-[700px] font-display text-[clamp(2.8rem,6vw,5.8rem)] leading-[.95] tracking-[-.05em]">Breathing life into<br /><em className="font-normal text-[#c4d39d]">sustainable buildings.</em></h2>
-            </div>
-            <p className="max-w-[300px] pb-2 text-[14px] leading-[1.8] text-[#d2ddc9]">Places shape how we live, work and feel. We help teams make choices that keep that human experience in view.</p>
           </div>
         </section>
 
