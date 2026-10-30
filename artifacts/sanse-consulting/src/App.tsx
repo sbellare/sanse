@@ -103,7 +103,12 @@ function Home() {
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#214a3b] text-[#e8eed3]">
               <Leaf size={18} strokeWidth={1.8} />
             </span>
-            <span className="font-display text-[27px] leading-none tracking-[-.05em]">sanse</span>
+            <span className="flex flex-col gap-1">
+              <span className="font-display text-[27px] leading-none tracking-[-.05em]">sanse</span>
+              <span className="whitespace-nowrap text-[8px] leading-none tracking-[.01em] text-[#638269]">
+                Breathing life into sustainable buildings.
+              </span>
+            </span>
           </a>
           <nav className="hidden items-center gap-8 lg:flex" aria-label="Main navigation">
             {navItems.map(([label, href]) => (
