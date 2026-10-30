@@ -162,10 +162,6 @@ function Home() {
                 </a>
                 <a href="#approach" className="inline-flex items-center gap-2 text-sm font-semibold text-[#486958]">How we work <ArrowDownRight size={16} /></a>
               </div>
-              <div className="mt-14 flex items-center gap-4 border-t border-[#203c32]/15 pt-5">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#dce4c9] text-[#45664e]"><Wind size={18} /></span>
-                <p className="font-display text-[20px] italic text-[#315b47]">“Breathing life into sustainable buildings.”</p>
-              </div>
             </div>
             <div className="reveal-delay relative">
               <div className="absolute -right-3 -top-6 z-10 hidden h-[112px] w-[112px] items-center justify-center rounded-full border border-[#f3f3e8]/70 bg-[#d5dfba] text-center text-[9px] font-bold uppercase leading-[1.55] tracking-[.18em] text-[#365944] shadow-sm sm:flex">
