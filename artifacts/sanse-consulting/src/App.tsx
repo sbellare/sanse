@@ -150,7 +150,7 @@ function Home() {
               <div className="mb-8 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[.22em] text-[#638269]">
                 <span className="h-px w-8 bg-[#8b9d72]" /> Sustainability, made workable
               </div>
-              <h1 className="max-w-[690px] font-display text-[clamp(3.7rem,8vw,7.25rem)] leading-[.91] tracking-[-.055em] text-[#234b3b]">
+              <h1 className="max-w-[690px] font-display text-[clamp(1.85rem,4vw,3.625rem)] leading-[.91] tracking-[-.055em] text-[#234b3b]">
                 Better buildings<br />begin with a <em className="font-normal text-[#8e9d66]">clear</em><br />way forward.
               </h1>
               <p className="mt-8 max-w-[435px] text-[16px] leading-[1.75] text-[#607166] sm:text-[17px]">
