@@ -44,7 +44,7 @@ function Home() {
   const navItems = [
     ['Approach', '#approach'],
     ['Services', '#services'],
-    ['Who we help', '#who-we-help'],
+    ['Team', '#Team'],
     ['LEED, made clearer', '#leed'],
   ];
 
@@ -246,7 +246,7 @@ function Home() {
           </div>
         </section>
 
-        <section className="relative overflow-hidden bg-[#d8e1c9] px-5 py-20 sm:px-8 sm:py-24 lg:px-14">
+        <section id="Team" className="relative overflow-hidden bg-[#d8e1c9] px-5 py-20 sm:px-8 sm:py-24 lg:px-14">
           <div className="pointer-events-none absolute -right-28 top-[-15rem] h-[520px] w-[520px] rounded-full border border-[#66815c]/20" />
           <div className="pointer-events-none absolute -right-10 top-[-11rem] h-[390px] w-[390px] rounded-full border border-[#66815c]/20" />
           <div className="relative mx-auto grid max-w-[1280px] items-center gap-12 lg:grid-cols-[1fr_.8fr]">
