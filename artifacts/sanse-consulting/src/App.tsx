@@ -165,7 +165,7 @@ function Home() {
             </div>
             <div className="reveal-delay relative">
               <div className="absolute -right-3 -top-6 z-10 hidden h-[112px] w-[112px] items-center justify-center rounded-full border border-[#f3f3e8]/70 bg-[#d5dfba] text-center text-[9px] font-bold uppercase leading-[1.55] tracking-[.18em] text-[#365944] shadow-sm sm:flex">
-                Places that<br />feel good<br />to be in
+                Every<br />structure<br />deserves<br />clean<br />breath.
               </div>
               <div className="relative aspect-[1.13/1] overflow-hidden rounded-[48%_48%_3%_3%] sm:rounded-[48%_48%_2%_2%]">
                 <img src="/sanse-building-landscape.jpg" alt="A sunlit low-impact building surrounded by meadow grasses and mature trees" className="h-full w-full object-cover" />
