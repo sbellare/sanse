@@ -172,7 +172,7 @@ function Home() {
                 <div className="absolute inset-0 bg-gradient-to-t from-[#183c2e]/40 via-transparent to-transparent" />
                 <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between text-[#fff9e9] sm:bottom-8 sm:left-8 sm:right-8">
                   <p className="max-w-[250px] font-display text-[25px] leading-tight sm:text-[30px]">A lighter footprint.<br />A fuller life.</p>
-                  <span className="hidden text-[9px] font-semibold uppercase tracking-[.2em] sm:block">Design in dialogue with place</span>
+                  <span className="hidden text-[9px] font-semibold uppercase tracking-[.2em] sm:block">Designing living, sustainable efficiency.</span>
                 </div>
               </div>
               <span className="absolute -bottom-7 -left-5 -z-0 h-28 w-28 rounded-full border border-[#adbc8c]/50 sm:-left-8" />
