@@ -46,6 +46,7 @@ function Home() {
     ['Services', '#services'],
     ['Team', '#Team'],
     ['LEED, made clearer', '#leed'],
+    ['Consultants', '#consultants'],
   ];
 
   const faqs = [
@@ -288,6 +289,32 @@ function Home() {
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="consultants" className="bg-[#e8ecdc] px-5 py-20 sm:px-8 sm:py-24 lg:px-14">
+          <div className="mx-auto grid max-w-[1280px] gap-10 lg:grid-cols-[.75fr_1.25fr] lg:gap-24">
+            <div>
+              <p className="mb-5 text-[10px] font-bold uppercase tracking-[.22em] text-[#75895f]">Consultants who connect the pieces</p>
+              <h2 className="font-display text-[clamp(2.7rem,5vw,4.8rem)] leading-[.98] tracking-[-.05em] text-[#234b3b]">Clear advice.<br /><em className="font-normal text-[#8e9d66]">Shared momentum.</em></h2>
+            </div>
+            <div>
+              <p className="max-w-[680px] text-[16px] leading-[1.8] text-[#5f7165]">Sanse Solutions consultants work alongside owners, designers, engineers and project teams to turn LEED goals into practical decisions, clear responsibilities and organized documentation.</p>
+              <div className="mt-8 grid gap-px overflow-hidden rounded-2xl border border-[#d8ddd0] bg-[#d8ddd0] sm:grid-cols-3">
+                {[
+                  ['Project direction', 'Clarify goals, timelines and relevant LEED pathways.'],
+                  ['Team alignment', 'Connect responsibilities across project disciplines.'],
+                  ['Certification support', 'Organize documentation for submission and review.'],
+                ].map(([heading, text], i) => (
+                  <div key={heading} className="bg-[#f1f1e6] p-5 sm:p-6">
+                    <span className="font-mono text-[10px] text-[#84946e]">0{i + 1}</span>
+                    <h3 className="mt-3 font-display text-[20px] leading-tight text-[#315b47]">{heading}</h3>
+                    <p className="mt-2 text-[12px] leading-[1.65] text-[#6b7a6f]">{text}</p>
+                  </div>
+                ))}
+              </div>
+              <a href="#contact" className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-[#315b47]">Talk with our consultants <ArrowRight size={16} /></a>
             </div>
           </div>
         </section>
