@@ -133,12 +133,12 @@ function Home() {
       </header>
 
       <main id="top">
-        <section className="bg-[#214a3b] px-5 py-20 text-[#f3f3e8] sm:px-8 sm:py-24 lg:px-14">
-          <div className="mx-auto flex max-w-[1280px] flex-col items-start justify-between gap-10 sm:flex-row sm:items-end">
+        <section className="bg-[#2b5947] px-5 py-6 text-[#f3f3e8] sm:px-8 sm:py-8 lg:px-14 lg:py-10">
+          <div className="mx-auto flex max-w-[1280px] flex-col items-start justify-between gap-5 sm:flex-row sm:items-end sm:gap-8">
             <div>
-              <span className="mb-6 flex h-12 w-12 items-center justify-center rounded-full bg-[#dce4c9] text-[#315b47]"><Wind size={22} /></span>
-              <p className="mb-4 text-[10px] font-bold uppercase tracking-[.22em] text-[#c2d0a0]">The Sanse point of view</p>
-              <h2 className="max-w-[700px] font-display text-[clamp(2.8rem,6vw,5.8rem)] leading-[.95] tracking-[-.05em]">Breathing life into<br /><em className="font-normal text-[#c4d39d]">sustainable buildings.</em></h2>
+              <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-[#dce4c9] text-[#315b47]"><Wind size={18} /></span>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-[.22em] text-[#c2d0a0]">The Sanse point of view</p>
+              <h2 className="max-w-[780px] font-display text-[clamp(1.75rem,4vw,3.4rem)] leading-[.95] tracking-[-.05em]">Breathing life into<br /><em className="font-normal text-[#c4d39d]">sustainable buildings.</em></h2>
             </div>
             <p className="max-w-[300px] pb-2 text-[14px] leading-[1.8] text-[#d2ddc9]">Places shape how we live, work and feel. We help teams make choices that keep that human experience in view.</p>
           </div>
