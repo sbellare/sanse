@@ -50,7 +50,7 @@ function Home() {
 
   const faqs = [
     {
-      question: 'When should we bring Sanse Consulting into a project?',
+      question: 'When should we bring Sanse Green into a project?',
       answer:
         'Earlier is usually more useful. In concept and pre-design, the team has the most room to compare pathways and coordinate sustainability goals with the project brief. We can also help projects already underway make sense of next steps.',
     },
@@ -62,7 +62,7 @@ function Home() {
     {
       question: 'Can you guarantee LEED certification?',
       answer:
-        'No. Certification decisions are made by the relevant certification body and depend on a project’s design, delivery and review. Sanse Consulting provides consulting support to help teams understand requirements and prepare their work.',
+        'No. Certification decisions are made by the relevant certification body and depend on a project’s design, delivery and review. Sanse Green provides consulting support to help teams understand requirements and prepare their work.',
     },
     {
       question: 'What if we are not sure which LEED pathway fits?',
@@ -74,7 +74,7 @@ function Home() {
   const makeDraft = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const message = [
-      `Hello Sanse Consulting,`,
+      `Hello Sanse Green,`,
       ``,
       `I’m ${inquiry.name || '[your name]'} and I’d like to talk about LEED certification consulting for a ${inquiry.project.toLowerCase()} project.`,
       inquiry.stage ? `Project stage: ${inquiry.stage}` : '',
@@ -99,12 +99,12 @@ function Home() {
     <div className="min-h-[100dvh] overflow-hidden bg-[#f3f3e8] text-[#203c32]">
       <header className="sticky top-0 z-50 border-b border-[#203c32]/10 bg-[#f3f3e8]/90 backdrop-blur-xl">
         <div className="mx-auto flex h-[76px] max-w-[1440px] items-center justify-between px-5 sm:px-8 lg:px-14">
-          <a href="#top" className="flex items-center gap-2.5" aria-label="Sanse Consulting home">
+          <a href="#top" className="flex items-center gap-2.5" aria-label="Sanse Green home">
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#214a3b] text-[#e8eed3]">
               <Leaf size={18} strokeWidth={1.8} />
             </span>
             <span className="flex flex-col gap-1">
-              <span className="font-display text-[27px] leading-none tracking-[-.05em]">sanse consulting</span>
+              <span className="font-display text-[27px] leading-none tracking-[-.05em]">sanse green</span>
               <span className="whitespace-nowrap text-[8px] leading-none tracking-[.01em] text-[#638269]">
                 Breathing life into sustainable buildings.
               </span>
@@ -137,7 +137,7 @@ function Home() {
           <div className="mx-auto flex max-w-[1280px] flex-col items-start justify-between gap-5 sm:flex-row sm:items-end sm:gap-8">
             <div>
               <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-[#dce4c9] text-[#315b47]"><Wind size={18} /></span>
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-[.22em] text-[#c2d0a0]">The Sanse Consulting point of view</p>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-[.22em] text-[#c2d0a0]">The Sanse Green point of view</p>
               <h2 className="max-w-[780px] font-display text-[clamp(1.75rem,4vw,3.4rem)] leading-[.95] tracking-[-.05em]">Breathing life into<br /><em className="font-normal text-[#c4d39d]">sustainable buildings.</em></h2>
             </div>
             <p className="max-w-[300px] pb-2 text-[14px] leading-[1.8] text-[#d2ddc9]">Places shape how we live, work and feel. We help teams make choices that keep that human experience in view.</p>
@@ -154,7 +154,7 @@ function Home() {
                 Better buildings<br />begin with a <em className="font-normal text-[#8e9d66]">clear</em><br />way forward.
               </h1>
               <p className="mt-8 max-w-[435px] text-[16px] leading-[1.75] text-[#607166] sm:text-[17px]">
-                Sanse Consulting helps project teams turn sustainability ambitions into thoughtful, achievable action—from the first conversation to the final submission.
+                Sanse Green helps project teams turn sustainability ambitions into thoughtful, achievable action—from the first conversation to the final submission.
               </p>
               <div className="mt-9 flex flex-wrap items-center gap-5">
                 <a href="#services" className="group inline-flex items-center gap-3 rounded-full bg-[#214a3b] px-6 py-4 text-sm font-semibold text-[#f3f3e8] transition-all hover:bg-[#183c2e]">
@@ -273,7 +273,7 @@ function Home() {
               </div>
               <div>
                 <p className="max-w-[680px] text-[16px] leading-[1.8] text-[#5f7165]">LEED is a widely used framework for thinking about how buildings affect people and the environment. Its requirements can help project teams bring energy, water, materials, indoor experience and site considerations into the same conversation.</p>
-                <p className="mt-5 max-w-[680px] text-[14px] leading-[1.8] text-[#708075]">Sanse Consulting provides <strong className="font-semibold text-[#315b47]">LEED certification consulting</strong> to help teams understand the process, plan their documentation and prepare for review. Certification is determined by the applicable review body; no outcome can be promised.</p>
+                <p className="mt-5 max-w-[680px] text-[14px] leading-[1.8] text-[#708075]">Sanse Green provides <strong className="font-semibold text-[#315b47]">LEED certification consulting</strong> to help teams understand the process, plan their documentation and prepare for review. Certification is determined by the applicable review body; no outcome can be promised.</p>
                 <div className="mt-9 grid gap-px overflow-hidden rounded-2xl border border-[#d8ddd0] bg-[#d8ddd0] sm:grid-cols-3">
                   {[
                     ['Understand', 'Explore goals and relevant requirements.'],
@@ -395,7 +395,7 @@ function Home() {
 
       <footer className="bg-[#214a3b] px-5 py-8 text-[#e7edd9] sm:px-8 lg:px-14">
         <div className="mx-auto flex max-w-[1280px] flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-          <a href="#top" className="flex items-center gap-2.5"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#dce4c9] text-[#315b47]"><Leaf size={16} /></span><span className="font-display text-[24px] tracking-[-.05em]">sanse consulting</span></a>
+          <a href="#top" className="flex items-center gap-2.5"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#dce4c9] text-[#315b47]"><Leaf size={16} /></span><span className="font-display text-[24px] tracking-[-.05em]">sanse green</span></a>
           <p className="text-[12px] text-[#c3d0bd]">Breathing life into sustainable buildings.</p>
           <a href="#top" className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.14em] text-[#dce4c9]">Back to top <ArrowUpRight size={14} /></a>
         </div>
