@@ -181,7 +181,7 @@ function Home() {
           <div className="mt-16 flex flex-wrap items-center justify-between gap-4 border-t border-[#203c32]/15 pt-5 text-[10px] font-semibold uppercase tracking-[.18em] text-[#718176]">
             <span>For owners, designers & project teams</span>
             <span className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#8e9d66]" /> LEED certification consulting</span>
-            <span className="hidden sm:block">A more considered built world</span>
+            <span className="hidden sm:block">Smarter buildings. Cleaner air.</span>
           </div>
         </section>
 
