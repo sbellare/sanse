@@ -401,7 +401,7 @@ function Home() {
                     <textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={4} placeholder="A few words about your goals, questions or timing..." className="mt-2 w-full resize-y rounded-xl border border-[#d5ddcc] bg-[#fbfaf4] px-4 py-3.5 text-sm text-[#203c32] outline-none focus:border-[#67815e]" data-testid="textarea-project" />
                   </label>
                   <button type="submit" className="group inline-flex items-center gap-3 rounded-full bg-[#214a3b] px-6 py-4 text-sm font-semibold text-[#f3f3e8] transition-colors hover:bg-[#183c2e]" data-testid="button-prepare-inquiry">
-                    Prepare my inquiry <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+                    Inquire <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
                   </button>
                 </form>
               ) : (
