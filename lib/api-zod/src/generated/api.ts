@@ -28,6 +28,8 @@ export const sendInquiryBodyStageMax = 200;
 
 export const sendInquiryBodyMessageMax = 5000;
 
+export const sendInquiryBodyWebsiteMax = 500;
+
 
 
 export const SendInquiryBody = zod.object({
@@ -35,7 +37,8 @@ export const SendInquiryBody = zod.object({
   "email": zod.string().email().max(sendInquiryBodyEmailMax),
   "project": zod.enum(['New building', 'Existing building', 'Interior fit-out', 'Campus or portfolio', 'Something else']),
   "stage": zod.string().max(sendInquiryBodyStageMax).optional(),
-  "message": zod.string().max(sendInquiryBodyMessageMax).optional()
+  "message": zod.string().max(sendInquiryBodyMessageMax).optional(),
+  "website": zod.string().max(sendInquiryBodyWebsiteMax).optional()
 })
 
 export const SendInquiryResponse = zod.object({

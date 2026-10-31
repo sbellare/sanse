@@ -39,6 +39,7 @@ function Home() {
     email: '',
     project: 'New building',
     stage: '',
+    website: '',
   });
   const [submitted, setSubmitted] = useState(false);
   const sendInquiry = useSendInquiry();
@@ -85,8 +86,19 @@ function Home() {
         },
       });
       setSubmitted(true);
-    } catch {
-      setSendError("We couldn't send your inquiry right now. Please try again.");
+    } catch (error) {
+      const responseData =
+        error && typeof error === 'object' && 'data' in error
+          ? (error as { data?: unknown }).data
+          : undefined;
+      const serverMessage =
+        responseData &&
+        typeof responseData === 'object' &&
+        'error' in responseData &&
+        typeof responseData.error === 'string'
+          ? responseData.error
+          : undefined;
+      setSendError(serverMessage ?? "We couldn't send your inquiry right now. Please try again.");
     }
   };
 
@@ -373,6 +385,15 @@ function Home() {
             <div className="rounded-[1.8rem] border border-[#203c32]/12 bg-[#f7f6ed] p-6 sm:p-9">
               {!submitted ? (
                 <form onSubmit={handleInquirySubmit} className="space-y-5">
+                  <input
+                    aria-hidden="true"
+                    autoComplete="off"
+                    className="absolute -left-[10000px] top-auto h-px w-px overflow-hidden"
+                    name="website"
+                    onChange={(event) => setInquiry({ ...inquiry, website: event.target.value })}
+                    tabIndex={-1}
+                    value={inquiry.website ?? ''}
+                  />
                   <div className="grid gap-5 sm:grid-cols-2">
                     <label className="block text-[11px] font-semibold text-[#536b5b]">Your name
                       <input required value={inquiry.name} onChange={(event) => setInquiry({ ...inquiry, name: event.target.value })} placeholder="Name" className="mt-2 w-full rounded-xl border border-[#d5ddcc] bg-[#fbfaf4] px-4 py-3.5 text-sm text-[#203c32] outline-none transition focus:border-[#67815e] focus:ring-2 focus:ring-[#67815e]/15" data-testid="input-name" />

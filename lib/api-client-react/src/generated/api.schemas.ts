@@ -33,6 +33,8 @@ export interface InquiryInput {
   stage?: string;
   /** @maxLength 5000 */
   message?: string;
+  /** @maxLength 500 */
+  website?: string;
 }
 
 export interface InquiryResponse {

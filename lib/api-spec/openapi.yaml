@@ -48,6 +48,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+        "429":
+          description: Too many inquiries from this address
+          headers:
+            Retry-After:
+              description: Seconds until another inquiry can be submitted
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
         "502":
           description: Email could not be delivered
           content:
@@ -89,6 +100,9 @@ components:
         message:
           type: string
           maxLength: 5000
+        website:
+          type: string
+          maxLength: 500
     InquiryResponse:
       type: object
       required: [success]
