@@ -1,5 +1,6 @@
 import { type FormEvent, type ReactNode, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useSendInquiry, type InquiryInput } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -31,15 +32,16 @@ const queryClient = new QueryClient();
 function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeFaq, setActiveFaq] = useState<number | null>(0);
-  const [draft, setDraft] = useState('');
-  const [copied, setCopied] = useState(false);
-  const [inquiry, setInquiry] = useState({
+  const [projectMessage, setProjectMessage] = useState('');
+  const [sendError, setSendError] = useState('');
+  const [inquiry, setInquiry] = useState<InquiryInput & { stage: string }>({
     name: '',
     email: '',
     project: 'New building',
     stage: '',
   });
   const [submitted, setSubmitted] = useState(false);
+  const sendInquiry = useSendInquiry();
 
   const navItems = [
     ['Approach', '#approach'],
@@ -72,28 +74,20 @@ function Home() {
     },
   ];
 
-  const makeDraft = (event: FormEvent<HTMLFormElement>) => {
+  const handleInquirySubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const message = [
-      `Hello Sanse Solutions,`,
-      ``,
-      `I’m ${inquiry.name || '[your name]'} and I’d like to talk about LEED certification consulting for a ${inquiry.project.toLowerCase()} project.`,
-      inquiry.stage ? `Project stage: ${inquiry.stage}` : '',
-      draft ? `A little about the project: ${draft}` : '',
-      `You can reach me at ${inquiry.email || '[your email]'}.`,
-      ``,
-      `Thank you.`,
-    ]
-      .filter(Boolean)
-      .join('\n');
-    setDraft(message);
-    setSubmitted(true);
-    setCopied(false);
-  };
-
-  const copyDraft = async () => {
-    await navigator.clipboard.writeText(draft);
-    setCopied(true);
+    setSendError('');
+    try {
+      await sendInquiry.mutateAsync({
+        data: {
+          ...inquiry,
+          message: projectMessage,
+        },
+      });
+      setSubmitted(true);
+    } catch {
+      setSendError("We couldn't send your inquiry right now. Please try again.");
+    }
   };
 
   return (
@@ -373,12 +367,12 @@ function Home() {
               <p className="mt-7 max-w-[360px] text-[14px] leading-[1.8] text-[#627369]">Tell us a little about your project. We’ll help you find the right first conversation.</p>
               <div className="mt-10 flex items-start gap-3 border-t border-[#203c32]/15 pt-5">
                 <span className="mt-0.5 text-[#67815e]"><ArrowUpRight size={17} /></span>
-                <p className="max-w-[300px] text-[12px] leading-[1.65] text-[#6e7e71]">No contact details are listed here yet. Use the form to prepare an inquiry you can copy and send through your preferred channel.</p>
+                <p className="max-w-[300px] text-[12px] leading-[1.65] text-[#6e7e71]">Use the form to send your project details directly to the Sanse Solutions team.</p>
               </div>
             </div>
             <div className="rounded-[1.8rem] border border-[#203c32]/12 bg-[#f7f6ed] p-6 sm:p-9">
               {!submitted ? (
-                <form onSubmit={makeDraft} className="space-y-5">
+                <form onSubmit={handleInquirySubmit} className="space-y-5">
                   <div className="grid gap-5 sm:grid-cols-2">
                     <label className="block text-[11px] font-semibold text-[#536b5b]">Your name
                       <input required value={inquiry.name} onChange={(event) => setInquiry({ ...inquiry, name: event.target.value })} placeholder="Name" className="mt-2 w-full rounded-xl border border-[#d5ddcc] bg-[#fbfaf4] px-4 py-3.5 text-sm text-[#203c32] outline-none transition focus:border-[#67815e] focus:ring-2 focus:ring-[#67815e]/15" data-testid="input-name" />
@@ -389,7 +383,7 @@ function Home() {
                   </div>
                   <div className="grid gap-5 sm:grid-cols-2">
                     <label className="block text-[11px] font-semibold text-[#536b5b]">Project type
-                      <select value={inquiry.project} onChange={(event) => setInquiry({ ...inquiry, project: event.target.value })} className="mt-2 w-full rounded-xl border border-[#d5ddcc] bg-[#fbfaf4] px-4 py-3.5 text-sm text-[#203c32] outline-none focus:border-[#67815e]" data-testid="select-project">
+                      <select value={inquiry.project} onChange={(event) => setInquiry({ ...inquiry, project: event.target.value as InquiryInput['project'] })} className="mt-2 w-full rounded-xl border border-[#d5ddcc] bg-[#fbfaf4] px-4 py-3.5 text-sm text-[#203c32] outline-none focus:border-[#67815e]" data-testid="select-project">
                         <option>New building</option><option>Existing building</option><option>Interior fit-out</option><option>Campus or portfolio</option><option>Something else</option>
                       </select>
                     </label>
@@ -398,21 +392,17 @@ function Home() {
                     </label>
                   </div>
                   <label className="block text-[11px] font-semibold text-[#536b5b]">What would be useful to talk through?
-                    <textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={4} placeholder="A few words about your goals, questions or timing..." className="mt-2 w-full resize-y rounded-xl border border-[#d5ddcc] bg-[#fbfaf4] px-4 py-3.5 text-sm text-[#203c32] outline-none focus:border-[#67815e]" data-testid="textarea-project" />
+                    <textarea value={projectMessage} onChange={(event) => setProjectMessage(event.target.value)} rows={4} placeholder="A few words about your goals, questions or timing..." className="mt-2 w-full resize-y rounded-xl border border-[#d5ddcc] bg-[#fbfaf4] px-4 py-3.5 text-sm text-[#203c32] outline-none focus:border-[#67815e]" data-testid="textarea-project" />
                   </label>
-                  <button type="submit" className="group inline-flex items-center gap-3 rounded-full bg-[#214a3b] px-6 py-4 text-sm font-semibold text-[#f3f3e8] transition-colors hover:bg-[#183c2e]" data-testid="button-prepare-inquiry">
-                    Inquire <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+                  {sendError && <p role="alert" className="text-sm text-red-700">{sendError}</p>}
+                  <button type="submit" disabled={sendInquiry.isPending} className="group inline-flex items-center gap-3 rounded-full bg-[#214a3b] px-6 py-4 text-sm font-semibold text-[#f3f3e8] transition-colors hover:bg-[#183c2e] disabled:cursor-wait disabled:opacity-70" data-testid="button-prepare-inquiry">
+                    {sendInquiry.isPending ? 'Sending…' : 'Inquire'} {!sendInquiry.isPending && <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />}
                   </button>
                 </form>
               ) : (
                 <div>
-                  <div className="mb-5 flex items-center gap-3 text-[#315b47]"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#dce7cc]"><Check size={17} /></span><h3 className="font-display text-[27px]">Your inquiry draft</h3></div>
-                  <p className="mb-4 text-[12px] leading-relaxed text-[#718075]">Copy this message and send it using your preferred contact method.</p>
-                  <textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={9} className="w-full rounded-xl border border-[#d5ddcc] bg-[#fbfaf4] px-4 py-3.5 text-[13px] leading-relaxed text-[#365844] outline-none focus:border-[#67815e]" data-testid="textarea-inquiry-draft" />
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <button onClick={copyDraft} className="inline-flex items-center gap-2 rounded-full bg-[#214a3b] px-5 py-3 text-sm font-semibold text-[#f3f3e8]" data-testid="button-copy-inquiry">{copied ? <><Check size={15} /> Copied</> : <>Copy inquiry <ArrowRight size={15} /></>}</button>
-                    <button onClick={() => setSubmitted(false)} className="rounded-full border border-[#b9c6ac] px-5 py-3 text-sm font-semibold text-[#486958]" data-testid="button-edit-inquiry">Edit details</button>
-                  </div>
+                  <div className="mb-5 flex items-center gap-3 text-[#315b47]"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#dce7cc]"><Check size={17} /></span><h3 className="font-display text-[27px]">Inquiry sent</h3></div>
+                  <p className="text-[13px] leading-relaxed text-[#718075]">Thank you, {inquiry.name}. Your project details have been emailed to the Sanse Solutions team. We’ll reply to {inquiry.email}.</p>
                 </div>
               )}
             </div>

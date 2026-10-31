@@ -24,6 +24,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /inquiries:
+    post:
+      operationId: sendInquiry
+      tags: [inquiries]
+      summary: Send a project inquiry by email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InquiryInput"
+      responses:
+        "200":
+          description: Inquiry email sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InquiryResponse"
+        "400":
+          description: Invalid inquiry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Email could not be delivered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +63,42 @@ components:
           type: string
       required:
         - status
+    InquiryInput:
+      type: object
+      required: [name, email, project]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        project:
+          type: string
+          enum:
+            - New building
+            - Existing building
+            - Interior fit-out
+            - Campus or portfolio
+            - Something else
+        stage:
+          type: string
+          maxLength: 200
+        message:
+          type: string
+          maxLength: 5000
+    InquiryResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+    ApiError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
 
