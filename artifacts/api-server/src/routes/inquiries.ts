@@ -44,6 +44,33 @@ router.post("/inquiries", async (req, res): Promise<void> => {
       return;
     }
 
+    try {
+      const acknowledgmentResponse = await connectors.proxy("resend", "/emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: "Sanse Solutions <info@sansesolutions.com>",
+          to: inquiry.email,
+          subject: "We received your inquiry | Sanse Solutions",
+          text: [
+            "Thank you for contacting Sanse Solutions.",
+            "",
+            "We’ve received your project inquiry, and our team will review your message.",
+            "We appreciate you reaching out.",
+          ].join("\n"),
+        }),
+      });
+
+      if (!acknowledgmentResponse.ok) {
+        req.log.warn(
+          { status: acknowledgmentResponse.status },
+          "Resend rejected inquiry acknowledgment",
+        );
+      }
+    } catch (error) {
+      req.log.warn({ err: error }, "Failed to send inquiry acknowledgment");
+    }
+
     res.json(SendInquiryResponse.parse({ success: true }));
   } catch (error) {
     req.log.error({ err: error }, "Failed to send website inquiry");

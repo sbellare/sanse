@@ -37,7 +37,7 @@ paths:
               $ref: "#/components/schemas/InquiryInput"
       responses:
         "200":
-          description: Inquiry email sent
+          description: Team notification sent; visitor acknowledgment is best-effort
           content:
             application/json:
               schema:
