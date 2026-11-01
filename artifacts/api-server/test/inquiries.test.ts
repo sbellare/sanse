@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import express from "express";
 import { createServer } from "node:http";
@@ -427,4 +429,67 @@ test("the background retry cycle attempts due inquiries", async () => {
 
   assert.equal(calls, 1);
   assert.equal(await service.getStatus(id), "delivered");
+});
+
+test("PostgreSQL retries pending inquiries after a process restart and recovers expired leases", {
+  skip: !process.env.DATABASE_URL,
+}, async () => {
+  const { pool } = await import("@workspace/db");
+  const schema = `inquiry_restart_${randomUUID().replaceAll("-", "")}`;
+  const ids = [randomUUID(), randomUUID()];
+  const workerPath = process.env.INQUIRY_RESTART_WORKER_PATH;
+  assert.ok(workerPath, "restart worker bundle should be configured by the test runner");
+
+  await pool.query(`CREATE SCHEMA "${schema}"`);
+  try {
+    await pool.query(
+      `CREATE TABLE "${schema}".inquiry_deliveries
+       (LIKE public.inquiry_deliveries INCLUDING ALL)`,
+    );
+    await pool.query(
+      `INSERT INTO "${schema}".inquiry_deliveries
+       (id, status, name, email, project, stage, message, attempts, next_attempt_at)
+       VALUES
+       ($1, 'pending', $3, $4, $5, $6, $7, 0, NOW()),
+       ($2, 'sending', $3, $4, $5, $6, $7, 1, NOW() - INTERVAL '1 minute')`,
+      [ids[0], ids[1], inquiry.name, inquiry.email, inquiry.project, inquiry.stage, inquiry.message],
+    );
+    await pool.query(
+      `UPDATE "${schema}".inquiry_deliveries
+       SET lease_until = NOW() - INTERVAL '1 second'
+       WHERE id = $1`,
+      [ids[1]],
+    );
+
+    const runWorker = () => {
+      const result = spawnSync(process.execPath, [workerPath], {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          PGOPTIONS: `${process.env.PGOPTIONS ?? ""} -c search_path=${schema}`.trim(),
+        },
+      });
+      assert.equal(result.status, 0, result.stderr || result.error?.message);
+      return JSON.parse(result.stdout) as { calls: string[] };
+    };
+
+    const firstRun = runWorker();
+    assert.deepEqual(firstRun.calls.sort(), ids.map((id) => `sanse-inquiry-${id}`).sort());
+
+    const statuses = await pool.query<{ id: string; status: string }>(
+      `SELECT id, status FROM "${schema}".inquiry_deliveries ORDER BY id`,
+    );
+    assert.deepEqual(statuses.rows, ids.map((id) => ({ id, status: "delivered" })).sort((a, b) =>
+      a.id.localeCompare(b.id),
+    ));
+
+    const restartedWorker = runWorker();
+    assert.deepEqual(restartedWorker.calls, []);
+  } finally {
+    try {
+      await pool.query(`DROP SCHEMA "${schema}" CASCADE`);
+    } finally {
+      await pool.end();
+    }
+  }
 });

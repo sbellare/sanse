@@ -124,95 +124,99 @@ async function getDatabasePool() {
   return pool;
 }
 
-const databaseStore: InquiryDeliveryStore = {
-  async enqueue(id, inquiry) {
-    const pool = await getDatabasePool();
-    await pool.query(
-      `INSERT INTO inquiry_deliveries
-       (id, status, name, email, project, stage, message, attempts, next_attempt_at)
-       VALUES ($1, 'pending', $2, $3, $4, $5, $6, 0, NOW())`,
-      [id, inquiry.name, inquiry.email, inquiry.project, inquiry.stage ?? null, inquiry.message ?? null],
-    );
-  },
-  async claim(id) {
-    const pool = await getDatabasePool();
-    const result = await pool.query<ClaimedInquiry>(
-      `UPDATE inquiry_deliveries
-       SET status = 'sending', attempts = attempts + 1,
-           lease_until = NOW() + ($2 * INTERVAL '1 millisecond'), updated_at = NOW()
-       WHERE id = $1 AND attempts < $3
-         AND ((status = 'pending' AND next_attempt_at <= NOW())
-           OR (status = 'sending' AND lease_until <= NOW()))
-       RETURNING id, name, email, project, stage, message, attempts`,
-      [id, LEASE_DURATION_MS, MAX_ATTEMPTS],
-    );
-    const row = result.rows[0];
-    if (!row || !row.name || !row.email || !row.project) return null;
-    return row;
-  },
-  async listDueIds(limit) {
-    const pool = await getDatabasePool();
-    const result = await pool.query<{ id: string }>(
-      `SELECT id FROM inquiry_deliveries
-       WHERE attempts < $2
-         AND ((status = 'pending' AND next_attempt_at <= NOW())
-           OR (status = 'sending' AND lease_until <= NOW()))
-       ORDER BY next_attempt_at, created_at
-       LIMIT $1`,
-      [limit, MAX_ATTEMPTS],
-    );
-    return result.rows.map(({ id }) => id);
-  },
-  async failExpiredAttempts() {
-    const pool = await getDatabasePool();
-    await pool.query(
-      `UPDATE inquiry_deliveries
-       SET status = 'failed', name = NULL, email = NULL, project = NULL,
-           stage = NULL, message = NULL, lease_until = NULL, updated_at = NOW()
-       WHERE status = 'sending' AND lease_until <= NOW() AND attempts >= $1`,
-      [MAX_ATTEMPTS],
-    );
-  },
-  async pruneOldStatuses() {
-    const pool = await getDatabasePool();
-    await pool.query(
-      `DELETE FROM inquiry_deliveries
-       WHERE status IN ('delivered', 'failed')
-         AND created_at < NOW() - INTERVAL '30 days'`,
-    );
-  },
-  async settle(id, status, nextAttemptAt) {
-    const pool = await getDatabasePool();
-    if (status === "pending") {
+export function createPostgresInquiryDeliveryStore(): InquiryDeliveryStore {
+  return {
+    async enqueue(id, inquiry) {
+      const pool = await getDatabasePool();
+      await pool.query(
+        `INSERT INTO inquiry_deliveries
+         (id, status, name, email, project, stage, message, attempts, next_attempt_at)
+         VALUES ($1, 'pending', $2, $3, $4, $5, $6, 0, NOW())`,
+        [id, inquiry.name, inquiry.email, inquiry.project, inquiry.stage ?? null, inquiry.message ?? null],
+      );
+    },
+    async claim(id) {
+      const pool = await getDatabasePool();
+      const result = await pool.query<ClaimedInquiry>(
+        `UPDATE inquiry_deliveries
+         SET status = 'sending', attempts = attempts + 1,
+             lease_until = NOW() + ($2 * INTERVAL '1 millisecond'), updated_at = NOW()
+         WHERE id = $1 AND attempts < $3
+           AND ((status = 'pending' AND next_attempt_at <= NOW())
+             OR (status = 'sending' AND lease_until <= NOW()))
+         RETURNING id, name, email, project, stage, message, attempts`,
+        [id, LEASE_DURATION_MS, MAX_ATTEMPTS],
+      );
+      const row = result.rows[0];
+      if (!row || !row.name || !row.email || !row.project) return null;
+      return row;
+    },
+    async listDueIds(limit) {
+      const pool = await getDatabasePool();
+      const result = await pool.query<{ id: string }>(
+        `SELECT id FROM inquiry_deliveries
+         WHERE attempts < $2
+           AND ((status = 'pending' AND next_attempt_at <= NOW())
+             OR (status = 'sending' AND lease_until <= NOW()))
+         ORDER BY next_attempt_at, created_at
+         LIMIT $1`,
+        [limit, MAX_ATTEMPTS],
+      );
+      return result.rows.map(({ id }) => id);
+    },
+    async failExpiredAttempts() {
+      const pool = await getDatabasePool();
       await pool.query(
         `UPDATE inquiry_deliveries
-         SET status = 'pending', next_attempt_at = $2, lease_until = NULL, updated_at = NOW()
-         WHERE id = $1 AND status = 'sending'`,
-        [id, nextAttemptAt],
+         SET status = 'failed', name = NULL, email = NULL, project = NULL,
+             stage = NULL, message = NULL, lease_until = NULL, updated_at = NOW()
+         WHERE status = 'sending' AND lease_until <= NOW() AND attempts >= $1`,
+        [MAX_ATTEMPTS],
       );
-      return;
-    }
+    },
+    async pruneOldStatuses() {
+      const pool = await getDatabasePool();
+      await pool.query(
+        `DELETE FROM inquiry_deliveries
+         WHERE status IN ('delivered', 'failed')
+           AND created_at < NOW() - INTERVAL '30 days'`,
+      );
+    },
+    async settle(id, status, nextAttemptAt) {
+      const pool = await getDatabasePool();
+      if (status === "pending") {
+        await pool.query(
+          `UPDATE inquiry_deliveries
+           SET status = 'pending', next_attempt_at = $2, lease_until = NULL, updated_at = NOW()
+           WHERE id = $1 AND status = 'sending'`,
+          [id, nextAttemptAt],
+        );
+        return;
+      }
 
-    await pool.query(
-      `UPDATE inquiry_deliveries
-       SET status = $2, name = NULL, email = NULL, project = NULL,
-           stage = NULL, message = NULL, lease_until = NULL, updated_at = NOW()
-       WHERE id = $1 AND status = 'sending'`,
-      [id, status],
-    );
-  },
-  async getStatus(id) {
-    const pool = await getDatabasePool();
-    const result = await pool.query<{ status: InquiryDeliveryStatus | "sending" }>(
-      "SELECT status FROM inquiry_deliveries WHERE id = $1",
-      [id],
-    );
-    const status = result.rows[0]?.status;
-    return status === "sending" ? "pending" : status ?? null;
-  },
-};
+      await pool.query(
+        `UPDATE inquiry_deliveries
+         SET status = $2, name = NULL, email = NULL, project = NULL,
+             stage = NULL, message = NULL, lease_until = NULL, updated_at = NOW()
+         WHERE id = $1 AND status = 'sending'`,
+        [id, status],
+      );
+    },
+    async getStatus(id) {
+      const pool = await getDatabasePool();
+      const result = await pool.query<{ status: InquiryDeliveryStatus | "sending" }>(
+        "SELECT status FROM inquiry_deliveries WHERE id = $1",
+        [id],
+      );
+      const status = result.rows[0]?.status;
+      return status === "sending" ? "pending" : status ?? null;
+    },
+  };
+}
 
-export const inquiryDeliveryService = createInquiryDeliveryService(databaseStore);
+export const inquiryDeliveryService = createInquiryDeliveryService(
+  createPostgresInquiryDeliveryStore(),
+);
 
 export async function processQueuedInquiries(): Promise<void> {
   await inquiryDeliveryService.processDue();
