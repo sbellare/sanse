@@ -6,7 +6,10 @@ import {
   SendInquiryBody,
   SendInquiryResponse,
 } from "@workspace/api-zod";
-import { checkInquiryRateLimit } from "../lib/inquiry-rate-limit";
+import {
+  checkInquiryRateLimit,
+  type InquiryRateLimitDecision,
+} from "../lib/inquiry-rate-limit";
 import {
   inquiryDeliveryService,
   type InquiryDeliveryStatus,
@@ -20,6 +23,8 @@ type EmailSender = (options: ProxyOptions) => Promise<Response>;
 export function createInquiryRouter(
   sendEmail: EmailSender = (options) => connectors.proxy("resend", "/emails", options),
   delivery: InquiryDeliveryService = inquiryDeliveryService,
+  rateLimitInquiry: (address: string) => Promise<InquiryRateLimitDecision> =
+    checkInquiryRateLimit,
 ): IRouter {
   const inquiryRouter: IRouter = Router();
 
@@ -36,7 +41,20 @@ export function createInquiryRouter(
       return;
     }
 
-    const rateLimit = checkInquiryRateLimit(req.ip || "unknown");
+    let rateLimit: InquiryRateLimitDecision;
+    try {
+      rateLimit = await rateLimitInquiry(req.ip || "unknown");
+    } catch (error) {
+      req.log.error(
+        { errorType: error instanceof Error ? error.name : "unknown" },
+        "Failed to check inquiry rate limit",
+      );
+      res.status(503).json({
+        error: "Inquiry submissions are temporarily unavailable. Please try again shortly.",
+      });
+      return;
+    }
+
     if (!rateLimit.allowed) {
       res.setHeader("Retry-After", String(rateLimit.retryAfterSeconds));
       res.status(429).json({

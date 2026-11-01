@@ -9,6 +9,10 @@ import {
   type InquiryDeliveryStore,
   type InquiryDetails,
 } from "../src/lib/inquiry-delivery";
+import {
+  createInquiryRateLimiter,
+  type InquiryRateLimitStore,
+} from "../src/lib/inquiry-rate-limit";
 import { createInquiryRouter } from "../src/routes/inquiries";
 
 const inquiry: InquiryDetails = {
@@ -34,6 +38,33 @@ type TestRecord = InquiryDetails & {
 };
 
 let requestNumber = 0;
+
+class MemoryInquiryRateLimitStore implements InquiryRateLimitStore {
+  readonly submissions = new Map<string, number[]>();
+
+  constructor(private readonly now: () => number = Date.now) {}
+
+  async consume(address: string, windowMs: number, limit: number) {
+    const now = this.now();
+    const recent = (this.submissions.get(address) ?? []).filter(
+      (submittedAt) => submittedAt > now - windowMs,
+    );
+    const allowed = recent.length < limit;
+    if (allowed) recent.push(now);
+    this.submissions.set(address, recent);
+    return {
+      allowed,
+      retryAfterSeconds: Math.max(
+        1,
+        Math.ceil(((recent[0] ?? now) + windowMs - now) / 1000),
+      ),
+    };
+  }
+}
+
+const defaultTestRateLimiter = createInquiryRateLimiter(
+  new MemoryInquiryRateLimitStore(),
+);
 
 class MemoryInquiryStore implements InquiryDeliveryStore {
   readonly records = new Map<string, TestRecord>();
@@ -128,7 +159,14 @@ function createTestDelivery(
 async function submitInquiry(
   delivery: InquiryDeliveryService,
   sendAcknowledgment: TestEmailSender = async () => new Response(null, { status: 200 }),
-  options: { address?: string; body?: unknown } = {},
+  options: {
+    address?: string;
+    body?: unknown;
+    rateLimiter?: (address: string) => Promise<{ allowed: true } | {
+      allowed: false;
+      retryAfterSeconds: number;
+    }>;
+  } = {},
 ) {
   const app = express();
   app.set("trust proxy", true);
@@ -137,7 +175,11 @@ async function submitInquiry(
     req.log = { warn() {}, error() {} } as typeof req.log;
     next();
   });
-  app.use(createInquiryRouter(sendAcknowledgment, delivery));
+  app.use(createInquiryRouter(
+    sendAcknowledgment,
+    delivery,
+    options.rateLimiter ?? defaultTestRateLimiter,
+  ));
 
   const testServer = createServer(app);
   await new Promise<void>((resolve) => testServer.listen(0, "127.0.0.1", resolve));
@@ -236,6 +278,26 @@ test("limits each address to five inquiries in fifteen minutes with Retry-After"
   assert.equal(store.records.size, 5);
   assert.equal(teamEmailCalls, 5);
   assert.equal(acknowledgmentCalls, 5);
+});
+
+test("shares the rolling limit across API instances and releases it after the window", async () => {
+  let now = 1_000_000;
+  const sharedStore = new MemoryInquiryRateLimitStore(() => now);
+  const firstInstance = createInquiryRateLimiter(sharedStore);
+  const secondInstance = createInquiryRateLimiter(sharedStore);
+  const address = "203.0.113.46";
+
+  for (let count = 0; count < 5; count += 1) {
+    const limiter = count % 2 === 0 ? firstInstance : secondInstance;
+    assert.deepEqual(await limiter(address), { allowed: true });
+  }
+
+  const throttled = await secondInstance(address);
+  assert.equal(throttled.allowed, false);
+  if (!throttled.allowed) assert.ok(throttled.retryAfterSeconds > 0);
+
+  now += 15 * 60 * 1000 + 1;
+  assert.deepEqual(await firstInstance(address), { allowed: true });
 });
 
 test("delivers the team notification before the visitor acknowledgment", async () => {
