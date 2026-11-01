@@ -253,7 +253,7 @@ test("delivers the team notification before the visitor acknowledgment", async (
 
   assert.equal(response.status, 200);
   assert.deepEqual(events, ["team", "visitor"]);
-  assert.equal(teamMessages[0]?.to, "hellsbells@gmail.com");
+  assert.equal(teamMessages[0]?.to, "info@sansesolutions.com");
   assert.match(teamMessages[0]?.text ?? "", /Name: Ada Example/);
   assert.match(teamMessages[0]?.text ?? "", /Project stage: Planning/);
   assert.match(teamMessages[0]?.text ?? "", /We are planning a low-carbon home\./);

@@ -77,7 +77,7 @@ export function createInquiryDeliveryService(
         },
         body: JSON.stringify({
           from: "Sanse Solutions <info@sansesolutions.com>",
-          to: "hellsbells@gmail.com",
+          to: "info@sansesolutions.com",
           reply_to: inquiry.email,
           subject: `Website inquiry: ${inquiry.project}`,
           text: buildEmail(inquiry),
