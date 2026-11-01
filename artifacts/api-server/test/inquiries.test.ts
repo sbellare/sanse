@@ -300,12 +300,14 @@ test("shares the rolling limit across API instances and releases it after the wi
   assert.deepEqual(await firstInstance(address), { allowed: true });
 });
 
-test("delivers the team notification before the visitor acknowledgment", async () => {
+test("sends the team notification with the submitter as the reply address", async () => {
   const events: string[] = [];
-  const teamMessages: { to: string; text: string }[] = [];
+  const teamMessages: { to: string; reply_to: string; text: string }[] = [];
   const { service } = createTestDelivery(undefined, async (options) => {
     events.push("team");
-    teamMessages.push(JSON.parse(options.body) as { to: string; text: string });
+    teamMessages.push(
+      JSON.parse(options.body) as { to: string; reply_to: string; text: string },
+    );
     return new Response(null, { status: 200 });
   });
   const { response } = await submitInquiry(service, async () => {
@@ -316,6 +318,7 @@ test("delivers the team notification before the visitor acknowledgment", async (
   assert.equal(response.status, 200);
   assert.deepEqual(events, ["team", "visitor"]);
   assert.equal(teamMessages[0]?.to, "info@sansesolutions.com");
+  assert.equal(teamMessages[0]?.reply_to, inquiry.email);
   assert.match(teamMessages[0]?.text ?? "", /Name: Ada Example/);
   assert.match(teamMessages[0]?.text ?? "", /Project stage: Planning/);
   assert.match(teamMessages[0]?.text ?? "", /We are planning a low-carbon home\./);
