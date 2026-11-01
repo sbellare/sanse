@@ -10,6 +10,7 @@ import {
   type InquiryDeliveryStatus,
   type InquiryDeliveryStore,
   type InquiryDetails,
+  type InquiryTerminalFailureEvent,
 } from "../src/lib/inquiry-delivery";
 import {
   createInquiryRateLimiter,
@@ -121,6 +122,7 @@ class MemoryInquiryStore implements InquiryDeliveryStore {
   }
 
   async failExpiredAttempts() {
+    const failures: { id: string; attempts: number }[] = [];
     for (const record of this.records.values()) {
       if (
         record.status === "sending" &&
@@ -128,8 +130,10 @@ class MemoryInquiryStore implements InquiryDeliveryStore {
         record.attempts >= 5
       ) {
         record.status = "failed";
+        failures.push({ id: record.id, attempts: record.attempts });
       }
     }
+    return failures;
   }
 
   async pruneOldStatuses() {}
@@ -151,10 +155,16 @@ class MemoryInquiryStore implements InquiryDeliveryStore {
 function createTestDelivery(
   store = new MemoryInquiryStore(),
   sendEmail: TestEmailSender = async () => new Response(null, { status: 200 }),
+  reportTerminalFailure: (event: InquiryTerminalFailureEvent) => void = () => {},
 ) {
   return {
     store,
-    service: createInquiryDeliveryService(store, sendEmail, () => store.clock),
+    service: createInquiryDeliveryService(
+      store,
+      sendEmail,
+      () => store.clock,
+      reportTerminalFailure,
+    ),
   };
 }
 
@@ -360,10 +370,15 @@ test("queues a thrown team notification without sending the visitor acknowledgme
 
 test("does not retry a permanent provider rejection and reports failure", async () => {
   let calls = 0;
-  const { service } = createTestDelivery(undefined, async () => {
-    calls += 1;
-    return new Response(null, { status: 400 });
-  });
+  const terminalFailures: InquiryTerminalFailureEvent[] = [];
+  const { service } = createTestDelivery(
+    undefined,
+    async () => {
+      calls += 1;
+      return new Response(null, { status: 400 });
+    },
+    (event) => terminalFailures.push(event),
+  );
   const { response, statusResponse } = await submitInquiry(service);
   const result = await response.json();
 
@@ -372,15 +387,29 @@ test("does not retry a permanent provider rejection and reports failure", async 
   assert.equal(calls, 1);
   assert.ok(statusResponse);
   assert.deepEqual(await statusResponse.json(), { status: "failed" });
+  assert.deepEqual(terminalFailures, [{
+    inquiryId: result.inquiryId,
+    attempts: 1,
+    reason: "provider_rejected",
+  }]);
+  const serializedEvent = JSON.stringify(terminalFailures);
+  for (const personalDetail of [inquiry.name, inquiry.email, inquiry.project, inquiry.message]) {
+    assert.equal(serializedEvent.includes(personalDetail), false);
+  }
 });
 
 test("uses the same provider idempotency key for bounded retry attempts", async () => {
   const store = new MemoryInquiryStore();
   const keys: string[] = [];
-  const { service } = createTestDelivery(store, async (options) => {
-    keys.push(options.headers["Idempotency-Key"]);
-    return new Response(null, { status: 503 });
-  });
+  const terminalFailures: InquiryTerminalFailureEvent[] = [];
+  const { service } = createTestDelivery(
+    store,
+    async (options) => {
+      keys.push(options.headers["Idempotency-Key"]);
+      return new Response(null, { status: 503 });
+    },
+    (event) => terminalFailures.push(event),
+  );
   const id = await service.enqueue(inquiry);
 
   assert.equal(await service.attempt(id), "pending");
@@ -396,6 +425,39 @@ test("uses the same provider idempotency key for bounded retry attempts", async 
   assert.equal(await service.attempt(id), "failed");
   assert.equal(keys.length, 5);
   assert.ok(keys.every((key) => key === `sanse-inquiry-${id}`));
+  assert.deepEqual(terminalFailures, [{
+    inquiryId: id,
+    attempts: 5,
+    reason: "retry_limit_reached",
+  }]);
+});
+
+test("reports expired terminal attempts without including inquiry details", async () => {
+  const store = new MemoryInquiryStore();
+  const terminalFailures: InquiryTerminalFailureEvent[] = [];
+  const { service } = createTestDelivery(
+    store,
+    undefined,
+    (event) => terminalFailures.push(event),
+  );
+  const id = await service.enqueue(inquiry);
+  const record = store.records.get(id);
+  assert.ok(record);
+  record.status = "sending";
+  record.attempts = 5;
+  record.leaseUntil = store.clock - 1;
+
+  await service.processDue();
+
+  assert.deepEqual(terminalFailures, [{
+    inquiryId: id,
+    attempts: 5,
+    reason: "attempt_lease_expired",
+  }]);
+  const serializedEvent = JSON.stringify(terminalFailures);
+  for (const personalDetail of [inquiry.name, inquiry.email, inquiry.project, inquiry.message]) {
+    assert.equal(serializedEvent.includes(personalDetail), false);
+  }
 });
 
 test("retries a pending notification and transitions status to delivered", async () => {

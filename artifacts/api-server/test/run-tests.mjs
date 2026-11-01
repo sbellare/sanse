@@ -22,7 +22,7 @@ try {
     bundle: true,
     platform: "node",
     format: "esm",
-    external: ["express", "@replit/connectors-sdk", "pg"],
+    external: ["express", "@replit/connectors-sdk", "pg", "pino"],
     absWorkingDir: artifactDir,
   };
   await Promise.all([

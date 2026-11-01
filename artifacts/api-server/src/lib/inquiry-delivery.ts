@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ReplitConnectors } from "@replit/connectors-sdk";
+import { logger } from "./logger";
 
 export type InquiryDetails = {
   name: string;
@@ -17,12 +18,19 @@ type EmailSender = (options: {
 }) => Promise<Response>;
 
 type ClaimedInquiry = InquiryDetails & { id: string; attempts: number };
+type ExpiredInquiryFailure = { id: string; attempts: number };
+export type InquiryTerminalFailureEvent = {
+  inquiryId: string;
+  attempts: number;
+  reason: "provider_rejected" | "retry_limit_reached" | "attempt_lease_expired";
+};
+type TerminalFailureReporter = (event: InquiryTerminalFailureEvent) => void;
 
 export interface InquiryDeliveryStore {
   enqueue(id: string, inquiry: InquiryDetails): Promise<void>;
   claim(id: string): Promise<ClaimedInquiry | null>;
   listDueIds(limit: number): Promise<string[]>;
-  failExpiredAttempts(): Promise<void>;
+  failExpiredAttempts(): Promise<ExpiredInquiryFailure[]>;
   pruneOldStatuses(): Promise<void>;
   settle(id: string, status: InquiryDeliveryStatus, nextAttemptAt?: Date): Promise<void>;
   getStatus(id: string): Promise<InquiryDeliveryStatus | null>;
@@ -61,9 +69,22 @@ export function createInquiryDeliveryService(
   store: InquiryDeliveryStore,
   sendEmail: EmailSender = sendTeamEmail,
   now: () => number = Date.now,
+  reportTerminalFailure: TerminalFailureReporter = (event) =>
+    logger.error(event, "Inquiry delivery permanently failed"),
 ): InquiryDeliveryService {
+  async function failExpiredAttempts(): Promise<void> {
+    const failures = await store.failExpiredAttempts();
+    for (const failure of failures) {
+      reportTerminalFailure({
+        inquiryId: failure.id,
+        attempts: failure.attempts,
+        reason: "attempt_lease_expired",
+      });
+    }
+  }
+
   async function attempt(id: string): Promise<InquiryDeliveryStatus | null> {
-    await store.failExpiredAttempts();
+    await failExpiredAttempts();
     const inquiry = await store.claim(id);
     if (!inquiry) return store.getStatus(id);
 
@@ -94,6 +115,11 @@ export function createInquiryDeliveryService(
 
     if (!retryableFailure || inquiry.attempts >= MAX_ATTEMPTS) {
       await store.settle(inquiry.id, "failed");
+      reportTerminalFailure({
+        inquiryId: inquiry.id,
+        attempts: inquiry.attempts,
+        reason: retryableFailure ? "retry_limit_reached" : "provider_rejected",
+      });
       return "failed";
     }
 
@@ -111,7 +137,7 @@ export function createInquiryDeliveryService(
     attempt,
     getStatus: (id) => store.getStatus(id),
     async processDue() {
-      await store.failExpiredAttempts();
+      await failExpiredAttempts();
       await store.pruneOldStatuses();
       const ids = await store.listDueIds(25);
       await Promise.all(ids.map((id) => attempt(id)));
@@ -166,13 +192,15 @@ export function createPostgresInquiryDeliveryStore(): InquiryDeliveryStore {
     },
     async failExpiredAttempts() {
       const pool = await getDatabasePool();
-      await pool.query(
+      const result = await pool.query<ExpiredInquiryFailure>(
         `UPDATE inquiry_deliveries
          SET status = 'failed', name = NULL, email = NULL, project = NULL,
              stage = NULL, message = NULL, lease_until = NULL, updated_at = NOW()
-         WHERE status = 'sending' AND lease_until <= NOW() AND attempts >= $1`,
+         WHERE status = 'sending' AND lease_until <= NOW() AND attempts >= $1
+         RETURNING id, attempts`,
         [MAX_ATTEMPTS],
       );
+      return result.rows;
     },
     async pruneOldStatuses() {
       const pool = await getDatabasePool();
