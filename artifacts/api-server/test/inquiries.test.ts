@@ -170,8 +170,10 @@ async function submitInquiry(
 
 test("delivers the team notification before the visitor acknowledgment", async () => {
   const events: string[] = [];
-  const { service } = createTestDelivery(undefined, async () => {
+  const teamMessages: { to: string; text: string }[] = [];
+  const { service } = createTestDelivery(undefined, async (options) => {
     events.push("team");
+    teamMessages.push(JSON.parse(options.body) as { to: string; text: string });
     return new Response(null, { status: 200 });
   });
   const { response } = await submitInquiry(service, async () => {
@@ -181,6 +183,10 @@ test("delivers the team notification before the visitor acknowledgment", async (
 
   assert.equal(response.status, 200);
   assert.deepEqual(events, ["team", "visitor"]);
+  assert.equal(teamMessages[0]?.to, "hellsbells@gmail.com");
+  assert.match(teamMessages[0]?.text ?? "", /Name: Ada Example/);
+  assert.match(teamMessages[0]?.text ?? "", /Project stage: Planning/);
+  assert.match(teamMessages[0]?.text ?? "", /We are planning a low-carbon home\./);
   assert.equal((await response.json()).status, "delivered");
 });
 

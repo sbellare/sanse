@@ -128,6 +128,10 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
 
 
+
+
+
+
 export const getSendInquiryUrl = () => {
 
 
@@ -286,3 +290,10 @@ export function useGetInquiryStatus<TData = Awaited<ReturnType<typeof getInquiry
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
+
