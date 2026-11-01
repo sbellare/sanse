@@ -1,7 +1,17 @@
 import { Router, type IRouter } from "express";
 import { ReplitConnectors } from "@replit/connectors-sdk";
-import { SendInquiryBody, SendInquiryResponse } from "@workspace/api-zod";
+import {
+  GetInquiryStatusParams,
+  GetInquiryStatusResponse,
+  SendInquiryBody,
+  SendInquiryResponse,
+} from "@workspace/api-zod";
 import { checkInquiryRateLimit } from "../lib/inquiry-rate-limit";
+import {
+  inquiryDeliveryService,
+  type InquiryDeliveryStatus,
+  type InquiryDeliveryService,
+} from "../lib/inquiry-delivery";
 
 const connectors = new ReplitConnectors();
 type ProxyOptions = NonNullable<Parameters<ReplitConnectors["proxy"]>[2]>;
@@ -9,13 +19,14 @@ type EmailSender = (options: ProxyOptions) => Promise<Response>;
 
 export function createInquiryRouter(
   sendEmail: EmailSender = (options) => connectors.proxy("resend", "/emails", options),
+  delivery: InquiryDeliveryService = inquiryDeliveryService,
 ): IRouter {
   const inquiryRouter: IRouter = Router();
 
   inquiryRouter.post("/inquiries", async (req, res): Promise<void> => {
     const honeypot = req.body?.website;
     if (typeof honeypot === "string" ? honeypot.trim() : honeypot != null) {
-      res.json(SendInquiryResponse.parse({ success: true }));
+      res.json(SendInquiryResponse.parse({ success: true, status: "delivered" }));
       return;
     }
 
@@ -35,74 +46,96 @@ export function createInquiryRouter(
     }
 
     const inquiry = parsed.data;
-    const text = [
-      "A new project inquiry was submitted through the Sanse Solutions website.",
-      "",
-      `Name: ${inquiry.name}`,
-      `Email: ${inquiry.email}`,
-      `Project type: ${inquiry.project}`,
-      `Project stage: ${inquiry.stage?.trim() || "Not provided"}`,
-      "",
-      "What they would like to discuss:",
-      inquiry.message?.trim() || "Not provided",
-    ].join("\n");
 
     try {
-      const response = await sendEmail({
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: "Sanse Solutions <info@sansesolutions.com>",
-          to: "info@sansesolutions.com",
-          reply_to: inquiry.email,
-          subject: `Website inquiry: ${inquiry.project}`,
-          text,
-        }),
-      });
-
-      if (!response.ok) {
-        req.log.error({ status: response.status }, "Resend rejected website inquiry");
-        res.status(502).json({ error: "We couldn't send your inquiry right now. Please try again." });
-        return;
-      }
-
+      const inquiryId = await delivery.enqueue(inquiry);
+      let status: InquiryDeliveryStatus | null | undefined;
       try {
-        const acknowledgmentResponse = await sendEmail({
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            from: "Sanse Solutions <info@sansesolutions.com>",
-            to: inquiry.email,
-            subject: "We received your inquiry | Sanse Solutions",
-            text: [
-              "Thank you for contacting Sanse Solutions.",
-              "",
-              "We’ve received your project inquiry, and our team will review your message.",
-              "We appreciate you reaching out.",
-            ].join("\n"),
-          }),
-        });
-
-        if (!acknowledgmentResponse.ok) {
-          req.log.warn(
-            { status: acknowledgmentResponse.status },
-            "Resend rejected inquiry acknowledgment",
-          );
-        }
+        status = await delivery.attempt(inquiryId);
       } catch (error) {
         req.log.warn(
           { errorType: error instanceof Error ? error.name : "unknown" },
-          "Failed to send inquiry acknowledgment",
+          "Inquiry was saved but its immediate delivery attempt could not finish",
         );
       }
 
-      res.json(SendInquiryResponse.parse({ success: true }));
+      if (status === "failed") {
+        res.status(503).json({
+          success: false,
+          status: "failed",
+          inquiryId,
+          error: "We couldn't deliver your inquiry. Please contact us directly or try again.",
+        });
+        return;
+      }
+
+      if (status === "delivered") {
+        try {
+          const acknowledgmentResponse = await sendEmail({
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              from: "Sanse Solutions <info@sansesolutions.com>",
+              to: inquiry.email,
+              subject: "We received your inquiry | Sanse Solutions",
+              text: [
+                "Thank you for contacting Sanse Solutions.",
+                "",
+                "We’ve received your project inquiry, and our team will review your message.",
+                "We appreciate you reaching out.",
+              ].join("\n"),
+            }),
+          });
+
+          if (!acknowledgmentResponse.ok) {
+            req.log.warn(
+              { status: acknowledgmentResponse.status },
+              "Resend rejected inquiry acknowledgment",
+            );
+          }
+        } catch (error) {
+          req.log.warn(
+            { errorType: error instanceof Error ? error.name : "unknown" },
+            "Failed to send inquiry acknowledgment",
+          );
+        }
+      }
+
+      const responseBody = SendInquiryResponse.parse({
+        success: true,
+        status: status === "delivered" ? "delivered" : "pending",
+        inquiryId,
+      });
+      res.status(status === "delivered" ? 200 : 202).json(responseBody);
     } catch (error) {
       req.log.error(
         { errorType: error instanceof Error ? error.name : "unknown" },
-        "Failed to send website inquiry",
+        "Failed to save website inquiry for delivery",
       );
-      res.status(502).json({ error: "We couldn't send your inquiry right now. Please try again." });
+      res.status(503).json({ error: "We couldn't safely save your inquiry. Please try again." });
+    }
+  });
+
+  inquiryRouter.get("/inquiries/:inquiryId/status", async (req, res): Promise<void> => {
+    const params = GetInquiryStatusParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(404).json({ error: "Inquiry status not found." });
+      return;
+    }
+
+    try {
+      const status = await delivery.getStatus(params.data.inquiryId);
+      if (!status) {
+        res.status(404).json({ error: "Inquiry status not found." });
+        return;
+      }
+      res.json(GetInquiryStatusResponse.parse({ status }));
+    } catch (error) {
+      req.log.error(
+        { errorType: error instanceof Error ? error.name : "unknown" },
+        "Failed to check inquiry delivery status",
+      );
+      res.status(503).json({ error: "Inquiry delivery status is temporarily unavailable." });
     }
   });
 

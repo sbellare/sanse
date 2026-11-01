@@ -37,7 +37,13 @@ paths:
               $ref: "#/components/schemas/InquiryInput"
       responses:
         "200":
-          description: Team notification sent; visitor acknowledgment is best-effort
+          description: Team notification delivered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InquiryResponse"
+        "202":
+          description: Inquiry saved and queued for delivery
           content:
             application/json:
               schema:
@@ -59,8 +65,39 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
-        "502":
-          description: Email could not be delivered
+        "503":
+          description: Inquiry could not be saved or was permanently undeliverable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /inquiries/{inquiryId}/status:
+    get:
+      operationId: getInquiryStatus
+      tags: [inquiries]
+      summary: Check project inquiry delivery status
+      parameters:
+        - name: inquiryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Current delivery status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InquiryStatusResponse"
+        "404":
+          description: Inquiry status not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "503":
+          description: Status is temporarily unavailable
           content:
             application/json:
               schema:
@@ -105,14 +142,35 @@ components:
           maxLength: 500
     InquiryResponse:
       type: object
-      required: [success]
+      required: [success, status]
       properties:
         success:
           type: boolean
+        status:
+          $ref: "#/components/schemas/InquiryDeliveryStatus"
+        inquiryId:
+          type: string
+          format: uuid
+    InquiryStatusResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/InquiryDeliveryStatus"
+    InquiryDeliveryStatus:
+      type: string
+      enum: [pending, delivered, failed]
     ApiError:
       type: object
       required: [error]
       properties:
         error:
           type: string
+        success:
+          type: boolean
+        status:
+          $ref: "#/components/schemas/InquiryDeliveryStatus"
+        inquiryId:
+          type: string
+          format: uuid
 

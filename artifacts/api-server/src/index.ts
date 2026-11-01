@@ -1,5 +1,9 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import {
+  inquiryRetryIntervalMs,
+  processQueuedInquiries,
+} from "./lib/inquiry-delivery";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +26,19 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+  const retryTimer = setInterval(() => {
+    void processQueuedInquiries().catch((error) => {
+      logger.error(
+        { errorType: error instanceof Error ? error.name : "unknown" },
+        "Inquiry retry cycle failed",
+      );
+    });
+  }, inquiryRetryIntervalMs);
+  retryTimer.unref();
+  void processQueuedInquiries().catch((error) => {
+    logger.error(
+      { errorType: error instanceof Error ? error.name : "unknown" },
+      "Initial inquiry retry cycle failed",
+    );
+  });
 });

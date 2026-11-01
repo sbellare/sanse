@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useSendInquiry, type InquiryInput } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -34,6 +34,8 @@ function Home() {
   const [activeFaq, setActiveFaq] = useState<number | null>(0);
   const [projectMessage, setProjectMessage] = useState('');
   const [sendError, setSendError] = useState('');
+  const [inquiryId, setInquiryId] = useState<string | null>(null);
+  const [deliveryStatus, setDeliveryStatus] = useState<'pending' | 'delivered' | 'failed' | null>(null);
   const [inquiry, setInquiry] = useState<InquiryInput & { stage: string }>({
     name: '',
     email: '',
@@ -43,6 +45,35 @@ function Home() {
   });
   const [submitted, setSubmitted] = useState(false);
   const sendInquiry = useSendInquiry();
+
+  useEffect(() => {
+    if (!submitted || deliveryStatus !== 'pending' || !inquiryId) return;
+
+    let stopped = false;
+    const pollDeliveryStatus = async () => {
+      try {
+        const response = await fetch(`/api/inquiries/${encodeURIComponent(inquiryId)}/status`);
+        if (!response.ok) return;
+        const result = (await response.json()) as { status?: string };
+        if (stopped || !['pending', 'delivered', 'failed'].includes(result.status ?? '')) return;
+
+        const status = result.status as 'pending' | 'delivered' | 'failed';
+        setDeliveryStatus(status);
+        if (status === 'failed') {
+          setSubmitted(false);
+          setSendError("We couldn't deliver your inquiry. Please contact us directly or try submitting again.");
+        }
+      } catch {
+        // Keep showing the queued state and retry the status check on the next interval.
+      }
+    };
+
+    const interval = window.setInterval(() => void pollDeliveryStatus(), 5_000);
+    return () => {
+      stopped = true;
+      window.clearInterval(interval);
+    };
+  }, [deliveryStatus, inquiryId, submitted]);
 
   const navItems = [
     ['Approach', '#approach'],
@@ -79,12 +110,14 @@ function Home() {
     event.preventDefault();
     setSendError('');
     try {
-      await sendInquiry.mutateAsync({
+      const result = await sendInquiry.mutateAsync({
         data: {
           ...inquiry,
           message: projectMessage,
         },
       });
+      setInquiryId(result.inquiryId ?? null);
+      setDeliveryStatus(result.status);
       setSubmitted(true);
     } catch (error) {
       const responseData =
@@ -422,8 +455,12 @@ function Home() {
                 </form>
               ) : (
                 <div>
-                  <div className="mb-5 flex items-center gap-3 text-[#315b47]"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#dce7cc]"><Check size={17} /></span><h3 className="font-display text-[27px]">Inquiry sent</h3></div>
-                  <p className="text-[13px] leading-relaxed text-[#718075]">Thank you, {inquiry.name}. Your project details have been emailed to the Sanse Solutions team. We’ll reply to {inquiry.email}.</p>
+                  <div className="mb-5 flex items-center gap-3 text-[#315b47]"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#dce7cc]"><Check size={17} /></span><h3 className="font-display text-[27px]">{deliveryStatus === 'pending' ? 'Inquiry received' : 'Inquiry sent'}</h3></div>
+                  <p className="text-[13px] leading-relaxed text-[#718075]">
+                    {deliveryStatus === 'pending'
+                      ? 'Your inquiry is safely saved and delivery is still pending. We’ll keep trying and update this status.'
+                      : `Thank you, ${inquiry.name}. Your project details have been delivered to the Sanse Solutions team. We’ll reply to ${inquiry.email}.`}
+                  </p>
                 </div>
               )}
             </div>

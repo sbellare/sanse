@@ -37,11 +37,29 @@ export interface InquiryInput {
   website?: string;
 }
 
+export type InquiryDeliveryStatus = typeof InquiryDeliveryStatus[keyof typeof InquiryDeliveryStatus];
+
+
+export const InquiryDeliveryStatus = {
+  pending: 'pending',
+  delivered: 'delivered',
+  failed: 'failed',
+} as const;
+
 export interface InquiryResponse {
   success: boolean;
+  status: InquiryDeliveryStatus;
+  inquiryId?: string;
+}
+
+export interface InquiryStatusResponse {
+  status: InquiryDeliveryStatus;
 }
 
 export interface ApiError {
   error: string;
+  success?: boolean;
+  status?: InquiryDeliveryStatus;
+  inquiryId?: string;
 }
 

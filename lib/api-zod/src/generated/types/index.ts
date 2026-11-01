@@ -8,6 +8,8 @@
 
 export * from './apiError';
 export * from './healthStatus';
+export * from './inquiryDeliveryStatus';
 export * from './inquiryInput';
 export * from './inquiryInputProject';
 export * from './inquiryResponse';
+export * from './inquiryStatusResponse';

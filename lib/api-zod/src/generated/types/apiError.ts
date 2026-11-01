@@ -5,7 +5,11 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { InquiryDeliveryStatus } from './inquiryDeliveryStatus';
 
 export interface ApiError {
   error: string;
+  success?: boolean;
+  status?: InquiryDeliveryStatus;
+  inquiryId?: string;
 }

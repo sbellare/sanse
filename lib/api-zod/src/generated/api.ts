@@ -42,7 +42,21 @@ export const SendInquiryBody = zod.object({
 })
 
 export const SendInquiryResponse = zod.object({
-  "success": zod.boolean()
+  "success": zod.boolean(),
+  "status": zod.enum(['pending', 'delivered', 'failed']),
+  "inquiryId": zod.string().uuid().optional()
+})
+
+
+/**
+ * @summary Check project inquiry delivery status
+ */
+export const GetInquiryStatusParams = zod.object({
+  "inquiryId": zod.coerce.string().uuid()
+})
+
+export const GetInquiryStatusResponse = zod.object({
+  "status": zod.enum(['pending', 'delivered', 'failed'])
 })
 
 

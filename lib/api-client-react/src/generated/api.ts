@@ -23,7 +23,8 @@ import type {
   ApiError,
   HealthStatus,
   InquiryInput,
-  InquiryResponse
+  InquiryResponse,
+  InquiryStatusResponse
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -127,10 +128,6 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
 
 
-
-
-
-
 export const getSendInquiryUrl = () => {
 
 
@@ -219,3 +216,73 @@ export const useSendInquiry = <TError = ErrorType<ApiError>,
       return useMutation(getSendInquiryMutationOptions(options));
     }
 
+export const getGetInquiryStatusUrl = (inquiryId: string,) => {
+
+
+
+
+  return `/api/inquiries/${inquiryId}/status`
+}
+
+/**
+ * @summary Check project inquiry delivery status
+ */
+export const getInquiryStatus = async (inquiryId: string, options?: Parameters<typeof customFetch>[1]): Promise<InquiryStatusResponse> => {
+
+  return customFetch<InquiryStatusResponse>(getGetInquiryStatusUrl(inquiryId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetInquiryStatusQueryKey = (inquiryId: string,) => {
+    return [
+    `/api/inquiries/${inquiryId}/status`
+    ] as const;
+    }
+
+
+export const getGetInquiryStatusQueryOptions = <TData = Awaited<ReturnType<typeof getInquiryStatus>>, TError = ErrorType<ApiError>>(inquiryId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInquiryStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetInquiryStatusQueryKey(inquiryId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getInquiryStatus>>> = ({ signal }) => getInquiryStatus(inquiryId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: inquiryId !== null && inquiryId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getInquiryStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetInquiryStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getInquiryStatus>>>
+export type GetInquiryStatusQueryError = ErrorType<ApiError>
+
+
+/**
+ * @summary Check project inquiry delivery status
+ */
+
+export function useGetInquiryStatus<TData = Awaited<ReturnType<typeof getInquiryStatus>>, TError = ErrorType<ApiError>>(
+ inquiryId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInquiryStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetInquiryStatusQueryOptions(inquiryId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
