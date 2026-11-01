@@ -448,7 +448,7 @@ function Home() {
                   <label className="block text-[11px] font-semibold text-[#536b5b]">What would be useful to talk through?
                     <textarea value={projectMessage} onChange={(event) => setProjectMessage(event.target.value)} rows={4} placeholder="A few words about your goals, questions or timing..." className="mt-2 w-full resize-y rounded-xl border border-[#d5ddcc] bg-[#fbfaf4] px-4 py-3.5 text-sm text-[#203c32] outline-none focus:border-[#67815e]" data-testid="textarea-project" />
                   </label>
-                  {sendError && <p role="alert" className="text-sm text-red-700">{sendError}</p>}
+                  {sendError && <p role="alert" aria-live="polite" data-testid="inquiry-error" className="text-sm text-red-700">{sendError}</p>}
                   <button type="submit" disabled={sendInquiry.isPending} className="group inline-flex items-center gap-3 rounded-full bg-[#214a3b] px-6 py-4 text-sm font-semibold text-[#f3f3e8] transition-colors hover:bg-[#183c2e] disabled:cursor-wait disabled:opacity-70" data-testid="button-prepare-inquiry">
                     {sendInquiry.isPending ? 'Sending…' : 'Inquire'} {!sendInquiry.isPending && <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />}
                   </button>

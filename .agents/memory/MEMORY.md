@@ -1,0 +1,1 @@
+- [Generated API declarations](generated-api-declarations.md) — rebuild workspace API client packages before diagnosing downstream type errors.

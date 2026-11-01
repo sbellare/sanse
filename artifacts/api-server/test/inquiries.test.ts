@@ -128,6 +128,7 @@ function createTestDelivery(
 async function submitInquiry(
   delivery: InquiryDeliveryService,
   sendAcknowledgment: TestEmailSender = async () => new Response(null, { status: 200 }),
+  options: { address?: string; body?: unknown } = {},
 ) {
   const app = express();
   app.set("trust proxy", true);
@@ -149,9 +150,9 @@ async function submitInquiry(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Forwarded-For": `192.0.2.${requestNumber}`,
+        "X-Forwarded-For": options.address ?? `192.0.2.${requestNumber}`,
       },
-      body: JSON.stringify(inquiry),
+      body: JSON.stringify(options.body ?? inquiry),
     });
     const submitted = await response.clone().json();
     const statusResponse = submitted.inquiryId
@@ -167,6 +168,75 @@ async function submitInquiry(
     });
   }
 }
+
+test("silently accepts a filled honeypot without saving or sending email", async () => {
+  let emailCalls = 0;
+  const { store, service } = createTestDelivery(undefined, async () => {
+    emailCalls += 1;
+    return new Response(null, { status: 200 });
+  });
+
+  const { response } = await submitInquiry(service, async () => {
+    emailCalls += 1;
+    return new Response(null, { status: 200 });
+  }, {
+    body: { ...inquiry, website: "https://spam.example" },
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { success: true, status: "delivered" });
+  assert.equal(store.records.size, 0);
+  assert.equal(emailCalls, 0);
+});
+
+test("returns a clear validation message for invalid inquiry details", async () => {
+  let emailCalls = 0;
+  const { store, service } = createTestDelivery(undefined, async () => {
+    emailCalls += 1;
+    return new Response(null, { status: 200 });
+  });
+
+  const { response } = await submitInquiry(service, undefined, {
+    body: { ...inquiry, email: "not-an-email" },
+  });
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error: "Please check the inquiry details and try again.",
+  });
+  assert.equal(store.records.size, 0);
+  assert.equal(emailCalls, 0);
+});
+
+test("limits each address to five inquiries in fifteen minutes with Retry-After", async () => {
+  let teamEmailCalls = 0;
+  let acknowledgmentCalls = 0;
+  const { store, service } = createTestDelivery(undefined, async () => {
+    teamEmailCalls += 1;
+    return new Response(null, { status: 200 });
+  });
+  const address = "198.51.100.77";
+  const responses = [];
+
+  for (let index = 0; index < 6; index += 1) {
+    const result = await submitInquiry(service, async () => {
+      acknowledgmentCalls += 1;
+      return new Response(null, { status: 200 });
+    }, { address });
+    responses.push(result.response);
+  }
+
+  assert.deepEqual(responses.slice(0, 5).map(({ status }) => status), [200, 200, 200, 200, 200]);
+  const throttled = responses[5];
+  assert.equal(throttled.status, 429);
+  const retryAfter = Number(throttled.headers.get("Retry-After"));
+  assert.ok(Number.isInteger(retryAfter) && retryAfter > 0 && retryAfter <= 15 * 60);
+  const body = await throttled.json();
+  assert.match(body.error, /wait about \d+ minutes before trying again/i);
+  assert.equal(store.records.size, 5);
+  assert.equal(teamEmailCalls, 5);
+  assert.equal(acknowledgmentCalls, 5);
+});
 
 test("delivers the team notification before the visitor acknowledgment", async () => {
   const events: string[] = [];
