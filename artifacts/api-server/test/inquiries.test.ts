@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 import express from "express";
 import { createServer } from "node:http";
@@ -613,6 +616,85 @@ test("PostgreSQL prevents a delayed worker from overwriting its recovered attemp
     assert.deepEqual(terminalFailures, []);
   } finally {
     if (id) await pool.query("DELETE FROM inquiry_deliveries WHERE id = $1", [id]);
+  }
+});
+
+test("PostgreSQL does not resend an accepted email after a provider response is lost", {
+  skip: !process.env.DATABASE_URL,
+}, async () => {
+  const { pool } = await import("@workspace/db");
+  const schema = `inquiry_lost_response_${randomUUID().replaceAll("-", "")}`;
+  const id = randomUUID();
+  const idempotencyKey = `sanse-inquiry-${id}`;
+  const workerPath = process.env.INQUIRY_RESTART_WORKER_PATH;
+  assert.ok(workerPath, "restart worker bundle should be configured by the test runner");
+
+  const providerDirectory = await mkdtemp(path.join(os.tmpdir(), "inquiry-provider-"));
+  const providerLedgerPath = path.join(providerDirectory, "ledger.json");
+
+  await pool.query(`CREATE SCHEMA "${schema}"`);
+  try {
+    await pool.query(
+      `CREATE TABLE "${schema}".inquiry_deliveries
+       (LIKE public.inquiry_deliveries INCLUDING ALL)`,
+    );
+    await pool.query(
+      `INSERT INTO "${schema}".inquiry_deliveries
+       (id, status, name, email, project, stage, message, attempts, next_attempt_at)
+       VALUES ($1, 'pending', $2, $3, $4, $5, $6, 0, NOW())`,
+      [id, inquiry.name, inquiry.email, inquiry.project, inquiry.stage, inquiry.message],
+    );
+
+    const runWorker = () => {
+      const result = spawnSync(process.execPath, [workerPath], {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          PGOPTIONS: `${process.env.PGOPTIONS ?? ""} -c search_path=${schema}`.trim(),
+          INQUIRY_TEST_PROVIDER_LEDGER: providerLedgerPath,
+        },
+      });
+      assert.equal(result.status, 0, result.stderr || result.error?.message);
+      return JSON.parse(result.stdout) as { calls: string[] };
+    };
+
+    const firstRun = runWorker();
+    assert.deepEqual(firstRun.calls, [idempotencyKey]);
+
+    const afterLostResponse = await pool.query<{ status: string; attempts: number }>(
+      `SELECT status, attempts FROM "${schema}".inquiry_deliveries WHERE id = $1`,
+      [id],
+    );
+    assert.deepEqual(afterLostResponse.rows, [{ status: "pending", attempts: 1 }]);
+
+    await pool.query(
+      `UPDATE "${schema}".inquiry_deliveries
+       SET next_attempt_at = NOW() - INTERVAL '1 second'
+       WHERE id = $1`,
+      [id],
+    );
+
+    const restartedWorker = runWorker();
+    assert.deepEqual(restartedWorker.calls, [idempotencyKey]);
+
+    const providerLedger = JSON.parse(await readFile(providerLedgerPath, "utf8")) as {
+      logicalEmails: string[];
+      requests: string[];
+    };
+    assert.deepEqual(providerLedger.logicalEmails, [idempotencyKey]);
+    assert.deepEqual(providerLedger.requests, [idempotencyKey, idempotencyKey]);
+
+    const delivered = await pool.query<{ status: string; attempts: number }>(
+      `SELECT status, attempts FROM "${schema}".inquiry_deliveries WHERE id = $1`,
+      [id],
+    );
+    assert.deepEqual(delivered.rows, [{ status: "delivered", attempts: 2 }]);
+  } finally {
+    try {
+      await pool.query(`DROP SCHEMA "${schema}" CASCADE`);
+    } finally {
+      await rm(providerDirectory, { recursive: true, force: true });
+    }
   }
 });
 
