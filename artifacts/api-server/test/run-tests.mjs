@@ -39,7 +39,7 @@ try {
   ]);
 
   const result = spawnSync(process.execPath, [
-    "--test", bundledTest, path.join(testDir, "vercel-typescript.test.mjs"),
+    "--test", bundledTest, path.join(testDir, "vercel-build.test.mjs"),
   ], {
     stdio: "inherit",
     env: { ...process.env, INQUIRY_RESTART_WORKER_PATH: restartWorker },

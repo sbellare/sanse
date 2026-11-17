@@ -19,4 +19,10 @@ Explicitly declare module and module-resolution settings in the API's leaf TypeS
 
 **Why:** Vercel's TypeScript wrapper sets defaults on the raw leaf configuration before TypeScript resolves `extends`. It can inject NodeNext module resolution over workspace Bundler settings and break extensionless shared-library exports. Ordinary local typechecks do not reproduce this behavior.
 
-**How to apply:** Use the Vercel-style compiler regression check as well as the ordinary API typecheck. Do not disable type checking or `noEmitOnError` to mask a deployment compiler mismatch.
+**How to apply:** Do not disable type checking or `noEmitOnError` to mask a deployment compiler mismatch.
+
+Prefer the already-built JavaScript output as Vercel's Express entrypoint, with a strict source typecheck in the build command.
+
+**Why:** A local TypeScript language-service mock passed while Vercel still failed. Vercel's host differs in symlink resolution, discovered-file tracking, and project-reference handling; such a mock is not proof of a working provider build.
+
+**How to apply:** Keep Vercel pointed at the build output directory, preserve a visible Express import for its entrypoint detector, and include generated logger workers. Verify the actual generated bundle rather than another approximate compiler host. A local build is not a confirmed successful Vercel deployment.
