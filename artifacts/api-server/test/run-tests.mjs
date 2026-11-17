@@ -9,6 +9,7 @@ const testDir = path.dirname(fileURLToPath(import.meta.url));
 const artifactDir = path.resolve(testDir, "..");
 const tempDir = await mkdtemp(path.join(artifactDir, ".test-run-"));
 const bundledTest = path.join(tempDir, "inquiries.test.mjs");
+const vercelRuntimeTest = path.join(tempDir, "vercel-runtime.test.mjs");
 const restartWorker = path.join(tempDir, "inquiry-restart-worker.mjs");
 
 try {
@@ -36,12 +37,19 @@ try {
       entryPoints: [path.join(testDir, "inquiry-restart-worker.ts")],
       outfile: restartWorker,
     }),
+    build({
+      ...buildOptions,
+      entryPoints: [path.join(testDir, "vercel-runtime.test.ts")],
+      outfile: vercelRuntimeTest,
+    }),
   ]);
 
   const result = spawnSync(process.execPath, [
     "--test",
     bundledTest,
+    vercelRuntimeTest,
     path.join(testDir, "vercel-typescript.test.mjs"),
+    path.join(testDir, "vercel-deployment.test.mjs"),
   ], {
     stdio: "inherit",
     env: { ...process.env, INQUIRY_RESTART_WORKER_PATH: restartWorker },

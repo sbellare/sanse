@@ -1,5 +1,9 @@
 import { Router, type IRouter } from "express";
-import { ReplitConnectors } from "@replit/connectors-sdk";
+import {
+  isEmailConfigured,
+  sendEmail as defaultSendEmail,
+  type EmailSender,
+} from "../lib/email-sender";
 import {
   GetInquiryStatusParams,
   GetInquiryStatusResponse,
@@ -16,15 +20,12 @@ import {
   type InquiryDeliveryService,
 } from "../lib/inquiry-delivery";
 
-const connectors = new ReplitConnectors();
-type ProxyOptions = NonNullable<Parameters<ReplitConnectors["proxy"]>[2]>;
-type EmailSender = (options: ProxyOptions) => Promise<Response>;
-
 export function createInquiryRouter(
-  sendEmail: EmailSender = (options) => connectors.proxy("resend", "/emails", options),
+  sendEmail: EmailSender = defaultSendEmail,
   delivery: InquiryDeliveryService = inquiryDeliveryService,
   rateLimitInquiry: (address: string) => Promise<InquiryRateLimitDecision> =
     checkInquiryRateLimit,
+  emailConfigured: () => boolean = isEmailConfigured,
 ): IRouter {
   const inquiryRouter: IRouter = Router();
 
@@ -38,6 +39,14 @@ export function createInquiryRouter(
     const parsed = SendInquiryBody.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Please check the inquiry details and try again." });
+      return;
+    }
+
+    if (!emailConfigured()) {
+      req.log.error("Inquiry email service is not configured.");
+      res.status(503).json({
+        error: "Inquiries are temporarily unavailable. Please email info@sansesolutions.com directly.",
+      });
       return;
     }
 

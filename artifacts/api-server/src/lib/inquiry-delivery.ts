@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { ReplitConnectors } from "@replit/connectors-sdk";
 import { logger } from "./logger";
+import { sendEmail as sendTeamEmail, type EmailSender } from "./email-sender";
 
 export type InquiryDetails = {
   name: string;
@@ -11,12 +11,6 @@ export type InquiryDetails = {
 };
 
 export type InquiryDeliveryStatus = "pending" | "delivered" | "failed";
-type EmailSender = (options: {
-  method: "POST";
-  headers: Record<string, string>;
-  body: string;
-}) => Promise<Response>;
-
 type ClaimedInquiry = InquiryDetails & { id: string; attempts: number };
 type ExpiredInquiryFailure = { id: string; attempts: number };
 export type InquiryTerminalFailureEvent = {
@@ -51,11 +45,6 @@ export interface InquiryDeliveryService {
 const MAX_ATTEMPTS = 5;
 const RETRY_DELAYS_MS = [60_000, 5 * 60_000, 30 * 60_000, 2 * 60 * 60_000];
 const LEASE_DURATION_MS = 2 * 60_000;
-const connectors = new ReplitConnectors();
-
-const sendTeamEmail: EmailSender = (options) =>
-  connectors.proxy("resend", "/emails", options);
-
 function buildEmail(inquiry: ClaimedInquiry): string {
   return [
     "A new project inquiry was submitted through the Sanse Solutions website.",
