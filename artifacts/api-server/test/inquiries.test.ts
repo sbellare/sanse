@@ -16,6 +16,7 @@ import {
   type InquiryDetails,
   type InquiryTerminalFailureEvent,
 } from "../src/lib/inquiry-delivery";
+import { createInquiryFailureAlertReporter } from "../src/lib/inquiry-failure-alert";
 import {
   checkInquiryRateLimit,
   createInquiryRateLimiter,
@@ -436,6 +437,66 @@ test("does not retry a permanent provider rejection and reports failure", async 
   for (const personalDetail of [inquiry.name, inquiry.email, inquiry.project, inquiry.message]) {
     assert.equal(serializedEvent.includes(personalDetail), false);
   }
+});
+
+test("sends only the approved failure fields to the HTTPS alert destination", async () => {
+  const requests: { url: string; init?: RequestInit }[] = [];
+  const reporter = createInquiryFailureAlertReporter(
+    "https://alerts.example.test/inquiry-failures",
+    async (input, init) => {
+      requests.push({ url: String(input), init });
+      return new Response(null, { status: 204 });
+    },
+  );
+
+  await reporter({
+    inquiryId: "inquiry-123",
+    attempts: 5,
+    reason: "retry_limit_reached",
+  });
+
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0]?.url, "https://alerts.example.test/inquiry-failures");
+  assert.equal(requests[0]?.init?.method, "POST");
+  assert.deepEqual(
+    JSON.parse(String(requests[0]?.init?.body)),
+    {
+      inquiryId: "inquiry-123",
+      attempts: 5,
+      category: "retry_limit_reached",
+    },
+  );
+  assert.equal(requests[0]?.init?.redirect, "error");
+});
+
+test("an unavailable alert destination cannot disrupt terminal inquiry status", async () => {
+  const { store, service } = createTestDelivery(
+    undefined,
+    async () => new Response(null, { status: 400 }),
+    () => {
+      throw new Error("alert destination unavailable");
+    },
+  );
+  const id = await service.enqueue(inquiry);
+
+  assert.equal(await service.attempt(id), "failed");
+  assert.equal(await service.getStatus(id), "failed");
+  assert.equal(store.records.get(id)?.status, "failed");
+});
+
+test("a failed alert request is absorbed by the alert reporter", async () => {
+  const reporter = createInquiryFailureAlertReporter(
+    "https://alerts.example.test/inquiry-failures",
+    async () => {
+      throw new Error("alert destination unavailable");
+    },
+  );
+
+  await assert.doesNotReject(reporter({
+    inquiryId: "inquiry-456",
+    attempts: 1,
+    reason: "provider_rejected",
+  }));
 });
 
 test("uses the same provider idempotency key for bounded retry attempts", async () => {

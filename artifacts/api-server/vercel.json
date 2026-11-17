@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "express",
+  "buildCommand": "pnpm run build",
+  "outputDirectory": "dist",
+  "functions": {
+    "dist/index.mjs": {
+      "includeFiles": "dist/**"
+    }
+  }
+}
