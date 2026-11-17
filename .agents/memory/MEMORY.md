@@ -1,1 +1,2 @@
 - [Generated API declarations](generated-api-declarations.md) — rebuild workspace API client packages before diagnosing downstream type errors.
+- [Vercel TypeScript defaults](vercel-typescript-defaults.md) — Vercel can override inherited module settings before TypeScript resolves extends.
