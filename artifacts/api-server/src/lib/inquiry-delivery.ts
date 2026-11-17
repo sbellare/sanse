@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ReplitConnectors } from "@replit/connectors-sdk";
+import { createInquiryFailureAlertReporter } from "./inquiry-failure-alert";
 import { logger } from "./logger";
 
 export type InquiryDetails = {
@@ -24,7 +25,9 @@ export type InquiryTerminalFailureEvent = {
   attempts: number;
   reason: "provider_rejected" | "retry_limit_reached" | "attempt_lease_expired";
 };
-type TerminalFailureReporter = (event: InquiryTerminalFailureEvent) => void;
+type TerminalFailureReporter = (
+  event: InquiryTerminalFailureEvent,
+) => void | Promise<void>;
 
 export interface InquiryDeliveryStore {
   enqueue(id: string, inquiry: InquiryDetails): Promise<void>;
@@ -74,13 +77,28 @@ export function createInquiryDeliveryService(
   store: InquiryDeliveryStore,
   sendEmail: EmailSender = sendTeamEmail,
   now: () => number = Date.now,
-  reportTerminalFailure: TerminalFailureReporter = (event) =>
-    logger.error(event, "Inquiry delivery permanently failed"),
+  reportTerminalFailure: TerminalFailureReporter = createInquiryFailureAlertReporter(),
 ): InquiryDeliveryService {
+  function notifyTerminalFailure(event: InquiryTerminalFailureEvent): void {
+    try {
+      void Promise.resolve(reportTerminalFailure(event)).catch((error: unknown) => {
+        logger.warn(
+          { errorType: error instanceof Error ? error.name : "unknown" },
+          "Inquiry failure alert could not be delivered",
+        );
+      });
+    } catch (error) {
+      logger.warn(
+        { errorType: error instanceof Error ? error.name : "unknown" },
+        "Inquiry failure alert could not be delivered",
+      );
+    }
+  }
+
   async function failExpiredAttempts(): Promise<void> {
     const failures = await store.failExpiredAttempts();
     for (const failure of failures) {
-      reportTerminalFailure({
+      notifyTerminalFailure({
         inquiryId: failure.id,
         attempts: failure.attempts,
         reason: "attempt_lease_expired",
@@ -121,7 +139,7 @@ export function createInquiryDeliveryService(
     if (!retryableFailure || inquiry.attempts >= MAX_ATTEMPTS) {
       const settled = await store.settle(inquiry.id, inquiry.attempts, "failed");
       if (!settled) return store.getStatus(inquiry.id);
-      reportTerminalFailure({
+      notifyTerminalFailure({
         inquiryId: inquiry.id,
         attempts: inquiry.attempts,
         reason: retryableFailure ? "retry_limit_reached" : "provider_rejected",
