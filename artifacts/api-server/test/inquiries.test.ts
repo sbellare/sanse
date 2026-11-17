@@ -263,6 +263,33 @@ test("returns a clear validation message for invalid inquiry details", async () 
   assert.equal(emailCalls, 0);
 });
 
+test("fails safely when shared rate-limit storage is unavailable", async () => {
+  let teamEmailCalls = 0;
+  let acknowledgmentCalls = 0;
+  const { store, service } = createTestDelivery(undefined, async () => {
+    teamEmailCalls += 1;
+    return new Response(null, { status: 200 });
+  });
+  const rateLimiter = createInquiryRateLimiter({
+    async consume() {
+      throw new Error("Rate-limit database is unavailable");
+    },
+  });
+
+  const { response } = await submitInquiry(service, async () => {
+    acknowledgmentCalls += 1;
+    return new Response(null, { status: 200 });
+  }, { rateLimiter });
+
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), {
+    error: "Inquiry submissions are temporarily unavailable. Please try again shortly.",
+  });
+  assert.equal(store.records.size, 0);
+  assert.equal(teamEmailCalls, 0);
+  assert.equal(acknowledgmentCalls, 0);
+});
+
 test("limits each address to five inquiries in fifteen minutes with Retry-After", async () => {
   let teamEmailCalls = 0;
   let acknowledgmentCalls = 0;
