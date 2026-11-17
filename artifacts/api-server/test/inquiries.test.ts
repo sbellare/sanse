@@ -13,6 +13,7 @@ import {
   type InquiryTerminalFailureEvent,
 } from "../src/lib/inquiry-delivery";
 import {
+  checkInquiryRateLimit,
   createInquiryRateLimiter,
   type InquiryRateLimitStore,
 } from "../src/lib/inquiry-rate-limit";
@@ -491,6 +492,38 @@ test("the background retry cycle attempts due inquiries", async () => {
 
   assert.equal(calls, 1);
   assert.equal(await service.getStatus(id), "delivered");
+});
+
+test("concurrent API instances share PostgreSQL's five-inquiry cap", {
+  skip: !process.env.DATABASE_URL,
+}, async () => {
+  const { pool } = await import("@workspace/db");
+  const uuid = randomUUID().replaceAll("-", "");
+  const address = `198.51.${Number.parseInt(uuid.slice(0, 2), 16)}.${Number.parseInt(uuid.slice(2, 4), 16)}`;
+  const instances = Array.from({ length: 10 }, () => createTestDelivery().service);
+
+  try {
+    const results = await Promise.all(
+      instances.map((service) =>
+        submitInquiry(
+          service,
+          async () => new Response(null, { status: 200 }),
+          { address, rateLimiter: checkInquiryRateLimit },
+        ),
+      ),
+    );
+    const allowed = results.filter(({ response }) => response.status === 200);
+    const blocked = results.filter(({ response }) => response.status === 429);
+
+    assert.equal(allowed.length, 5);
+    assert.equal(blocked.length, 5);
+    for (const { response } of blocked) {
+      const retryAfter = Number(response.headers.get("Retry-After"));
+      assert.ok(Number.isInteger(retryAfter) && retryAfter > 0);
+    }
+  } finally {
+    await pool.query("DELETE FROM inquiry_rate_limits WHERE address = $1", [address]);
+  }
 });
 
 test("PostgreSQL retries pending inquiries after a process restart and recovers expired leases", {
