@@ -6,6 +6,7 @@ import express from "express";
 import { createServer } from "node:http";
 import {
   createInquiryDeliveryService,
+  createPostgresInquiryDeliveryStore,
   type InquiryDeliveryService,
   type InquiryDeliveryStatus,
   type InquiryDeliveryStore,
@@ -139,11 +140,19 @@ class MemoryInquiryStore implements InquiryDeliveryStore {
 
   async pruneOldStatuses() {}
 
-  async settle(id: string, status: InquiryDeliveryStatus, nextAttemptAt?: Date) {
+  async settle(
+    id: string,
+    attempt: number,
+    status: InquiryDeliveryStatus,
+    nextAttemptAt?: Date,
+  ) {
     const record = this.records.get(id);
-    assert.ok(record);
+    if (!record || record.status !== "sending" || record.attempts !== attempt) {
+      return false;
+    }
     record.status = status;
     if (status === "pending") record.nextAttemptAt = nextAttemptAt?.getTime() ?? this.clock;
+    return true;
   }
 
   async getStatus(id: string) {
@@ -550,6 +559,60 @@ test("concurrent API instances share PostgreSQL's five-inquiry cap", {
     }
   } finally {
     await pool.query("DELETE FROM inquiry_rate_limits WHERE address = $1", [address]);
+  }
+});
+
+test("PostgreSQL prevents a delayed worker from overwriting its recovered attempt", {
+  skip: !process.env.DATABASE_URL,
+}, async () => {
+  const { pool } = await import("@workspace/db");
+  let releaseFirstResponse!: (response: Response) => void;
+  let notifyFirstStarted!: () => void;
+  const firstResponse = new Promise<Response>((resolve) => {
+    releaseFirstResponse = resolve;
+  });
+  const firstStarted = new Promise<void>((resolve) => {
+    notifyFirstStarted = resolve;
+  });
+  const terminalFailures: InquiryTerminalFailureEvent[] = [];
+  let calls = 0;
+  const delivery = createInquiryDeliveryService(
+    createPostgresInquiryDeliveryStore(),
+    async () => {
+      calls += 1;
+      if (calls === 1) {
+        notifyFirstStarted();
+        return firstResponse;
+      }
+      return new Response(null, { status: 200 });
+    },
+    Date.now,
+    (event) => terminalFailures.push(event),
+  );
+
+  let id: string | undefined;
+  try {
+    id = await delivery.enqueue(inquiry);
+    const delayedAttempt = delivery.attempt(id);
+    await firstStarted;
+
+    await pool.query(
+      "UPDATE inquiry_deliveries SET lease_until = NOW() - INTERVAL '1 second' WHERE id = $1",
+      [id],
+    );
+    assert.equal(await delivery.attempt(id), "delivered");
+
+    releaseFirstResponse(new Response(null, { status: 400 }));
+    assert.equal(await delayedAttempt, "delivered");
+
+    const result = await pool.query<{ status: string; attempts: number; lease_until: Date | null }>(
+      "SELECT status, attempts, lease_until FROM inquiry_deliveries WHERE id = $1",
+      [id],
+    );
+    assert.deepEqual(result.rows, [{ status: "delivered", attempts: 2, lease_until: null }]);
+    assert.deepEqual(terminalFailures, []);
+  } finally {
+    if (id) await pool.query("DELETE FROM inquiry_deliveries WHERE id = $1", [id]);
   }
 });
 

@@ -32,7 +32,12 @@ export interface InquiryDeliveryStore {
   listDueIds(limit: number): Promise<string[]>;
   failExpiredAttempts(): Promise<ExpiredInquiryFailure[]>;
   pruneOldStatuses(): Promise<void>;
-  settle(id: string, status: InquiryDeliveryStatus, nextAttemptAt?: Date): Promise<void>;
+  settle(
+    id: string,
+    attempt: number,
+    status: InquiryDeliveryStatus,
+    nextAttemptAt?: Date,
+  ): Promise<boolean>;
   getStatus(id: string): Promise<InquiryDeliveryStatus | null>;
 }
 
@@ -105,8 +110,8 @@ export function createInquiryDeliveryService(
         }),
       });
       if (response.ok) {
-        await store.settle(inquiry.id, "delivered");
-        return "delivered";
+        const settled = await store.settle(inquiry.id, inquiry.attempts, "delivered");
+        return settled ? "delivered" : store.getStatus(inquiry.id);
       }
       retryableFailure = response.status === 429 || response.status >= 500;
     } catch {
@@ -114,7 +119,8 @@ export function createInquiryDeliveryService(
     }
 
     if (!retryableFailure || inquiry.attempts >= MAX_ATTEMPTS) {
-      await store.settle(inquiry.id, "failed");
+      const settled = await store.settle(inquiry.id, inquiry.attempts, "failed");
+      if (!settled) return store.getStatus(inquiry.id);
       reportTerminalFailure({
         inquiryId: inquiry.id,
         attempts: inquiry.attempts,
@@ -124,8 +130,13 @@ export function createInquiryDeliveryService(
     }
 
     const delay = RETRY_DELAYS_MS[inquiry.attempts - 1];
-    await store.settle(inquiry.id, "pending", new Date(now() + delay));
-    return "pending";
+    const settled = await store.settle(
+      inquiry.id,
+      inquiry.attempts,
+      "pending",
+      new Date(now() + delay),
+    );
+    return settled ? "pending" : store.getStatus(inquiry.id);
   }
 
   return {
@@ -210,25 +221,26 @@ export function createPostgresInquiryDeliveryStore(): InquiryDeliveryStore {
            AND created_at < NOW() - INTERVAL '30 days'`,
       );
     },
-    async settle(id, status, nextAttemptAt) {
+    async settle(id, attempt, status, nextAttemptAt) {
       const pool = await getDatabasePool();
       if (status === "pending") {
-        await pool.query(
+        const result = await pool.query(
           `UPDATE inquiry_deliveries
            SET status = 'pending', next_attempt_at = $2, lease_until = NULL, updated_at = NOW()
-           WHERE id = $1 AND status = 'sending'`,
-          [id, nextAttemptAt],
+           WHERE id = $1 AND status = 'sending' AND attempts = $3`,
+          [id, nextAttemptAt, attempt],
         );
-        return;
+        return result.rowCount === 1;
       }
 
-      await pool.query(
+      const result = await pool.query(
         `UPDATE inquiry_deliveries
          SET status = $2, name = NULL, email = NULL, project = NULL,
              stage = NULL, message = NULL, lease_until = NULL, updated_at = NOW()
-         WHERE id = $1 AND status = 'sending'`,
-        [id, status],
+         WHERE id = $1 AND status = 'sending' AND attempts = $3`,
+        [id, status, attempt],
       );
+      return result.rowCount === 1;
     },
     async getStatus(id) {
       const pool = await getDatabasePool();
